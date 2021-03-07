@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 import { GraphbackCoreMetadata } from '@graphback/core';
+import { ObjectID } from 'bson';
 import { buildSchema } from 'graphql';
 import { advanceTo } from 'jest-date-mock';
 import { DexieDBDataProvider } from '../src/DexieDBDataProvider';
@@ -7,7 +8,7 @@ import { Context, createTestingContext } from './__util__';
 
 describe('DexieDBDataProvider Basic CRUD', () => {
   interface Todo {
-    _id: string;
+    _id: ObjectID;
     text: string;
   }
   let context: Context;
