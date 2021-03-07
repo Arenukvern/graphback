@@ -1,25 +1,21 @@
-import { parseRelationshipAnnotation } from '@graphback/core';
-import { Collection, IndexSpec } from 'dexie';
+import Dexie, { IndexSpec } from 'dexie';
 import { GraphQLField, GraphQLObjectType } from 'graphql';
 import { parseMetadata } from 'graphql-metadata';
-
 export async function findAndCreateIndexes(
   baseType: GraphQLObjectType,
-  collection: Collection,
+  table: Dexie.Table,
 ) {
   const indexes = getIndexFields(baseType);
-
-  await applyIndexes(indexes, collection);
+  await applyIndexes(indexes, table);
 }
 
-export async function applyIndexes(
-  indexes: IndexSpec[],
-  collection: Collection,
-) {
-  if (indexes.length === 0) {
-    return;
-  }
-  collection.createIndexes(indexes).catch((error: any) => {
+export async function applyIndexes(indexes: IndexSpec[], table: Dexie.Table) {
+  if (indexes.length === 0) return;
+
+  try {
+    // collection.createIndexes(indexes).catch((error: any) => {
+    // });
+  } catch (error) {
     let message: string;
     if (error.codeName === 'IndexOptionsConflict') {
       // This Index exists but with a different name
@@ -42,29 +38,29 @@ export async function applyIndexes(
     console.error(
       `${message} If all else fails, try recreating the index manually.`,
     );
-  });
+  }
 }
 
 export function getIndexFields(baseType: GraphQLObjectType): IndexSpec[] {
   const res: IndexSpec[] = [];
-  const fields = baseType.getFields();
-  Object.keys(fields).forEach((k: string) => {
-    const field = fields[k];
+  // const fields = baseType.getFields();
+  // Object.keys(fields).forEach((k: string) => {
+  //   const field = fields[k];
 
-    // Add Index on relation fields
-    const relationIndex = getRelationIndex(field);
-    if (relationIndex !== undefined) {
-      res.push(relationIndex);
+  //   // Add Index on relation fields
+  //   const relationIndex = getRelationIndex(field);
+  //   if (relationIndex !== undefined) {
+  //     res.push(relationIndex);
 
-      return;
-    }
+  //     return;
+  //   }
 
-    // Add custom Index if found e.g. @index
-    const customIndex = getCustomIndex(field);
-    if (customIndex !== undefined) {
-      res.push(customIndex);
-    }
-  });
+  //   // Add custom Index if found e.g. @index
+  //   const customIndex = getCustomIndex(field);
+  //   if (customIndex !== undefined) {
+  //     res.push(customIndex);
+  //   }
+  // });
 
   return res;
 }
@@ -87,18 +83,18 @@ export function getCustomIndex(field: GraphQLField<any, any>): IndexSpec {
   }
 }
 
-export function getRelationIndex(field: GraphQLField<any, any>): IndexSpec {
-  const relationshipData = parseRelationshipAnnotation(field.description);
-  if (
-    relationshipData?.kind &&
-    ['manyToOne', 'manyToMany'].includes(relationshipData.kind)
-  ) {
-    return {
-      key: {
-        [relationshipData.key]: 1,
-      },
-    };
-  } else {
-    return undefined;
-  }
-}
+// export function getRelationIndex(field: GraphQLField<any, any>): IndexSpec {
+//   const relationshipData = parseRelationshipAnnotation(field.description);
+//   if (
+//     relationshipData?.kind &&
+//     ['manyToOne', 'manyToMany'].includes(relationshipData.kind)
+//   ) {
+//     return {
+//       // key: {
+//       //   [relationshipData.key]: 1,
+//       // },
+//     };
+//   } else {
+//     return undefined;
+//   }
+// }
