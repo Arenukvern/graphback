@@ -1,5 +1,5 @@
 import { SchemaCRUDPlugin } from '@graphback/codegen-schema';
-import { GraphbackCoreMetadata } from '@graphback/core';
+import { GraphbackCoreMetadata, Maybe } from '@graphback/core';
 import Dexie, { IndexSpec, Table } from 'dexie';
 import { buildSchema } from 'graphql';
 import { DexieDBDataProvider } from '../src/DexieDBDataProvider';
@@ -10,7 +10,10 @@ Dexie.dependencies.IDBKeyRange = require('fake-indexeddb/lib/FDBKeyRange');
 export interface Context {
   providers: { [modelname: string]: DexieDBDataProvider };
   db: Dexie;
-  findIndex(arg: { tableName: string; indexName: string }): Promise<IndexSpec>;
+  findIndex(arg: {
+    tableName: string;
+    indexName: string;
+  }): Promise<Maybe<IndexSpec>>;
 }
 
 export async function createTestingContext(
@@ -51,6 +54,7 @@ export async function createTestingContext(
 
   // if seed data is supplied, insert it into tables
   if (config?.seedData) {
+    db.open();
     const tableNames = Object.keys(config.seedData);
     for (const tableName of tableNames) {
       for (const element of config.seedData[tableName]) {
@@ -58,7 +62,6 @@ export async function createTestingContext(
       }
     }
   }
-
   const waitTime = 2000;
   const findIndex: Context['findIndex'] = async ({ indexName, tableName }) => {
     const startTime = Date.now();
@@ -72,8 +75,12 @@ export async function createTestingContext(
         const indexes = tableFound.schema.indexes;
         const foundIndex = indexes.find((index) => index.name == indexName);
         if (foundIndex) return foundIndex;
+        // check primary key as it will be indexed, but not included in indexes
+        const primaryKey = tableFound.schema.primKey;
+        if (primaryKey.name === indexName) return primaryKey;
       }
     } while (Date.now() - startTime < waitTime);
+    return null;
   };
 
   return { providers, db, findIndex };

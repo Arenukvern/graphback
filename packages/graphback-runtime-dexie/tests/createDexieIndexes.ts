@@ -3,7 +3,6 @@ import { Context, createTestingContext } from './__util__';
 
 describe('DexieDB indexing', () => {
   let context: Context;
-
   it('can create default indexes', async () => {
     context = await createTestingContext(`
       """
@@ -20,21 +19,19 @@ describe('DexieDB indexing', () => {
 
       scalar GraphbackObjectID
       `);
-
     const index = await context.findIndex({
       indexName: 'text',
       tableName: 'note',
     });
     const expectedIndex: Partial<IndexSpec> = {
-      name: 'text_1',
+      auto: false,
+      compound: false,
+      keyPath: 'text',
+      multi: false,
+      name: 'text',
+      src: 'text',
+      unique: false,
     };
-    // {
-    //   key: {
-    //     text: 1,
-    //   },
-    //   name: 'text_1',
-    //   ns: 'test.note',
-    // }
     expect(index).toMatchObject(expectedIndex);
   });
 

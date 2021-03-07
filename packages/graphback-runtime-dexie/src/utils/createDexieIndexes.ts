@@ -55,7 +55,7 @@ export const getIndexedFieldsString = (
     };
     const getFieldSymbol = () => {
       for (const [field, value] of Object.entries(indexSpec)) {
-        if (value != null) {
+        if (field != 'name' && value != null) {
           const sym = getSymbol(field as keyof IndexSpec);
           return sym;
         }
@@ -83,8 +83,9 @@ export async function applyIndexes({ tableName, db, indexes }: ApplyIndexes) {
   if (indexes.length === 0) return;
 
   try {
-    db.version(db.verno).stores({
-      [tableName]: getIndexedFieldsString(indexes),
+    const strIndexedFields = getIndexedFieldsString(indexes);
+    db.version(db.verno == null || db.verno < 1 ? 1 : db.verno).stores({
+      [tableName]: strIndexedFields,
     });
   } catch (error) {
     console.warn('applyIndexes raw error', error);
@@ -140,15 +141,13 @@ export function getCustomIndex(
 ): Maybe<Partial<IndexSpec>> {
   const indexMetadata: any = parseMetadata('index', field.description);
   if (indexMetadata) {
-    const indexSpec: IndexSpec = Object.assign(
+    const indexSpec: Partial<IndexSpec> = Object.assign(
       {
-        key: {
-          [field.name]: 1,
-        },
+        name: field.name,
       },
       indexMetadata,
     );
-
+    console.log(indexSpec);
     return indexSpec;
   } else {
     return undefined;
@@ -164,7 +163,7 @@ export function getRelationIndex(
     ['manyToOne', 'manyToMany'].includes(relationshipData.kind)
   ) {
     return {
-      name: relationshipData.field,
+      name: relationshipData.key,
     };
   } else {
     return undefined;

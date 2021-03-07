@@ -13,7 +13,7 @@ import {
 } from '@graphback/core';
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
-import { findAndCreateIndexes } from './utils/createIndexes';
+import { findAndCreateIndexes } from './utils/createDexieIndexes';
 // interface SortOrder {
 //   [fieldName: string]: 1 | -1;
 // }
