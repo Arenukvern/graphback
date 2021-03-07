@@ -6,6 +6,8 @@ import { DexieDBDataProvider } from '../src/DexieDBDataProvider';
 
 Dexie.dependencies.indexedDB = require('fake-indexeddb');
 Dexie.dependencies.IDBKeyRange = require('fake-indexeddb/lib/FDBKeyRange');
+// https://dexie.org/docs/Dexie/Dexie.debug
+Dexie['debug'] = true;
 
 export interface Context {
   providers: { [modelname: string]: DexieDBDataProvider };

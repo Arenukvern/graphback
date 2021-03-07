@@ -1,8 +1,10 @@
 /* eslint-disable max-lines */
 import { GraphbackCoreMetadata } from '@graphback/core';
 import { buildSchema } from 'graphql';
+import { advanceTo } from 'jest-date-mock';
 import { DexieDBDataProvider } from '../src/DexieDBDataProvider';
 import { Context, createTestingContext } from './__util__';
+
 describe('DexieDBDataProvider Basic CRUD', () => {
   interface Todo {
     _id: string;
@@ -103,26 +105,26 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     expect(data._id).toEqual(todo._id);
   });
 
-  // test('find first 1 todo(s) excluding first todo', async () => {
-  //   context = await createTestingContext(todoSchema, {
-  //     seedData: {
-  //       Todos: defaultTodoSeed,
-  //     },
-  //   });
-  //   const todos = await context.providers.Todos.findBy(
-  //     { page: { limit: 1, offset: 1 } },
-  //     ['text'],
-  //   );
+  test('find first 1 todo(s) excluding first todo', async () => {
+    context = await createTestingContext(todoSchema, {
+      seedData: {
+        Todos: defaultTodoSeed,
+      },
+    });
+    const todos = await context.providers.Todos.findBy(
+      { page: { limit: 1, offset: 1 } },
+      ['text'],
+    );
 
-  //   // check that count is total number of seeded Todos
-  //   const count = await context.providers.Todos.count({});
-  //   expect(count).toEqual(defaultTodoSeed.length);
+    // check that count is total number of seeded Todos
+    const count = await context.providers.Todos.count({});
+    expect(count).toEqual(defaultTodoSeed.length);
 
-  //   // check limit applied
-  //   expect(todos.length).toEqual(1);
+    // check limit applied
+    expect(todos.length).toEqual(1);
 
-  //   expect(todos[0].text).toEqual('todo2');
-  // });
+    expect(todos[0].text).toEqual('todo2');
+  });
 
   // test('find Todo by text', async () => {
   //   context = await createTestingContext(todoSchema, {
@@ -260,27 +262,27 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //     expect(todos[t].text).toEqual(`todo${5 - t}`);
   //   }
   // });
+  // FIXME: NotFoundError: No objectStore named note in this database
+  test('createdAt', async () => {
+    context = await createTestingContext(`
+    """
+    @model
+    @versioned
+    """
+    type Note {
+      _id: GraphbackObjectID!
+      text: String
+    }
 
-  // test('createdAt', async () => {
-  //   context = await createTestingContext(`
-  //   """
-  //   @model
-  //   @versioned
-  //   """
-  //   type Note {
-  //     _id: GraphbackObjectID!
-  //     text: String
-  //   }
+    scalar GraphbackObjectID
+    `);
+    const cDate = new Date(2020, 5, 26, 18, 29, 23);
+    advanceTo(cDate);
 
-  //   scalar GraphbackObjectID
-  //   `);
-  //   const cDate = new Date(2020, 5, 26, 18, 29, 23);
-  //   advanceTo(cDate);
-
-  //   const res = await context.providers.Note.create({ text: 'asdf' });
-  //   expect(res.createdAt).toEqual(cDate.getTime());
-  //   expect(res.createdAt).toEqual(res.updatedAt);
-  // });
+    const res = await context.providers.Note.create({ text: 'asdf' });
+    expect(res.createdAt).toEqual(cDate.getTime());
+    expect(res.createdAt).toEqual(res.updatedAt);
+  });
 
   // test('updatedAt', async () => {
   //   context = await createTestingContext(`
