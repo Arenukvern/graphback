@@ -61,20 +61,18 @@ describe('DexieDB indexing', () => {
       `);
 
     const index = await context.findIndex({
-      indexName: 'note',
-      tableName: 'meta',
+      indexName: '[meta+pages]',
+      tableName: 'note',
     });
     const expectedIndex: Partial<IndexSpec> = {
-      name: 'compound_index',
+      name: '[meta+pages]',
+      keyPath: ['meta', 'pages'],
+      unique: false,
+      multi: false,
+      auto: false,
+      compound: true,
+      src: '[meta+pages]',
     };
-    // {
-    //   key: {
-    //     meta: 1,
-    //     pages: 1,
-    //   },
-    //   name: 'compound_index',
-    //   ns: 'test.note',
-    // }
     expect(index).toMatchObject(expectedIndex);
   });
 
@@ -108,7 +106,13 @@ describe('DexieDB indexing', () => {
       indexName: 'noteId',
     });
     const expectedIndex: Partial<IndexSpec> = {
-      name: 'noteId_1',
+      name: 'noteId',
+      keyPath: 'noteId',
+      unique: false,
+      multi: false,
+      auto: false,
+      compound: false,
+      src: 'noteId',
     };
     // {
     //   key: {

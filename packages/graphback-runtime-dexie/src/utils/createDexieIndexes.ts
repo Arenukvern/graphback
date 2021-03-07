@@ -2,7 +2,6 @@ import { Maybe, parseRelationshipAnnotation } from '@graphback/core';
 import Dexie, { IndexSpec } from 'dexie';
 import { GraphQLField, GraphQLObjectType } from 'graphql';
 import { parseMetadata } from 'graphql-metadata';
-
 interface DbTableCreate {
   db: Dexie;
   tableName: string;
@@ -34,6 +33,16 @@ export const getIndexedFieldsString = (
   indexes: Partial<IndexSpec>[],
 ): string => {
   const strArr: Maybe<string>[] = indexes.reduce((indexesArr, indexSpec) => {
+    if (indexSpec.compound) {
+      const arr =
+        indexSpec.keyPath != null && Array.isArray(indexSpec.keyPath)
+          ? indexSpec.keyPath
+          : [indexSpec.keyPath];
+      const finalStr = `[${arr.join('+')}]`;
+      indexesArr.push(finalStr);
+      return indexesArr;
+    }
+
     // see more at https://dexie.org/docs/Version/Version.stores()
     const getSymbol = (field: keyof IndexSpec) => {
       switch (field) {
@@ -141,12 +150,32 @@ export function getCustomIndex(
 ): Maybe<Partial<IndexSpec>> {
   const indexMetadata: any = parseMetadata('index', field.description);
   if (indexMetadata) {
-    const indexSpec: Partial<IndexSpec> = Object.assign(
-      {
-        name: field.name,
-      },
-      indexMetadata,
-    );
+    const indexSpec: Partial<IndexSpec> = {
+      name: field.name,
+    };
+    if (typeof indexMetadata === 'object') {
+      // unwrappinng case of proxy
+      const obj = JSON.parse(JSON.stringify(indexMetadata));
+      if (obj.hasOwnProperty('key')) {
+        const key = obj['key'] as Maybe<Record<string, string>>;
+        if (key != null) {
+          indexSpec.keyPath = Object.keys(key);
+          switch (indexSpec.keyPath.length) {
+            case 2:
+              indexSpec.compound = true;
+              break;
+            case 0:
+              // nothing
+              break;
+            default:
+              console.error(
+                `Custom index for field: ${field.name} have ${indexSpec.keyPath.length} keys but can have only 2`,
+              );
+          }
+        }
+      }
+    }
+
     console.log(indexSpec);
     return indexSpec;
   } else {
