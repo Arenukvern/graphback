@@ -1,21 +1,93 @@
+import { Maybe, parseRelationshipAnnotation } from '@graphback/core';
 import Dexie, { IndexSpec } from 'dexie';
 import { GraphQLField, GraphQLObjectType } from 'graphql';
 import { parseMetadata } from 'graphql-metadata';
-export async function findAndCreateIndexes(
-  baseType: GraphQLObjectType,
-  table: Dexie.Table,
-) {
-  const indexes = getIndexFields(baseType);
-  await applyIndexes(indexes, table);
+
+interface DbTableCreate {
+  db: Dexie;
+  tableName: string;
+}
+interface ApplyIndexes extends DbTableCreate {
+  indexes: Partial<IndexSpec>[];
 }
 
-export async function applyIndexes(indexes: IndexSpec[], table: Dexie.Table) {
+interface FindAndCreateIndexes extends DbTableCreate {
+  baseType: GraphQLObjectType;
+}
+
+export async function findAndCreateIndexes({
+  baseType,
+  db,
+  tableName,
+}: FindAndCreateIndexes) {
+  const indexes = getIndexFields(baseType);
+  await applyIndexes({ indexes, db, tableName });
+}
+
+/**
+ * Should get correct indexes for filds based on
+ * IndexSpec. See more at https://dexie.org/docs/Version/Version.stores()
+ * @param indexes
+ * @returns {string}
+ */
+export const getIndexedFieldsString = (
+  indexes: Partial<IndexSpec>[],
+): string => {
+  const strArr: Maybe<string>[] = indexes.reduce((indexesArr, indexSpec) => {
+    // see more at https://dexie.org/docs/Version/Version.stores()
+    const getSymbol = (field: keyof IndexSpec) => {
+      switch (field) {
+        case 'auto':
+          return '++';
+        case 'compound':
+          return '';
+        case 'keyPath':
+          return '';
+        case 'multi':
+          return '*';
+        case 'name':
+          return '';
+        case 'src':
+          return '';
+        case 'unique':
+          return '&';
+      }
+    };
+    const getFieldSymbol = () => {
+      for (const [field, value] of Object.entries(indexSpec)) {
+        if (value != null) {
+          const sym = getSymbol(field as keyof IndexSpec);
+          return sym;
+        }
+      }
+      return '';
+    };
+    const indexName = indexSpec.name;
+    const sym = getFieldSymbol();
+    const finalIndex = `${sym}${indexName}`;
+    indexesArr.push(finalIndex);
+    return indexesArr;
+  }, []);
+
+  const strIndexes = strArr
+    .filter((el) => {
+      if (el == null || el.length == 0) return false;
+      return true;
+    })
+    .join(',');
+
+  return strIndexes;
+};
+
+export async function applyIndexes({ tableName, db, indexes }: ApplyIndexes) {
   if (indexes.length === 0) return;
 
   try {
-    // collection.createIndexes(indexes).catch((error: any) => {
-    // });
+    db.version(db.verno).stores({
+      [tableName]: getIndexedFieldsString(indexes),
+    });
   } catch (error) {
+    console.warn('applyIndexes raw error', error);
     let message: string;
     if (error.codeName === 'IndexOptionsConflict') {
       // This Index exists but with a different name
@@ -41,31 +113,31 @@ export async function applyIndexes(indexes: IndexSpec[], table: Dexie.Table) {
   }
 }
 
-export function getIndexFields(baseType: GraphQLObjectType): IndexSpec[] {
-  const res: IndexSpec[] = [];
-  // const fields = baseType.getFields();
-  // Object.keys(fields).forEach((k: string) => {
-  //   const field = fields[k];
+export function getIndexFields(
+  baseType: GraphQLObjectType,
+): Partial<IndexSpec>[] {
+  const res: Partial<IndexSpec>[] = [];
+  const fields = baseType.getFields();
+  for (const field of Object.values(fields)) {
+    // Add Index on relation fields
+    const relationIndex = getRelationIndex(field);
+    if (relationIndex != null) {
+      res.push(relationIndex);
+      continue;
+    }
 
-  //   // Add Index on relation fields
-  //   const relationIndex = getRelationIndex(field);
-  //   if (relationIndex !== undefined) {
-  //     res.push(relationIndex);
-
-  //     return;
-  //   }
-
-  //   // Add custom Index if found e.g. @index
-  //   const customIndex = getCustomIndex(field);
-  //   if (customIndex !== undefined) {
-  //     res.push(customIndex);
-  //   }
-  // });
-
+    // Add custom Index if found e.g. @index
+    const customIndex = getCustomIndex(field);
+    if (customIndex !== undefined) {
+      res.push(customIndex);
+    }
+  }
   return res;
 }
 
-export function getCustomIndex(field: GraphQLField<any, any>): IndexSpec {
+export function getCustomIndex(
+  field: GraphQLField<any, any>,
+): Maybe<Partial<IndexSpec>> {
   const indexMetadata: any = parseMetadata('index', field.description);
   if (indexMetadata) {
     const indexSpec: IndexSpec = Object.assign(
@@ -83,18 +155,18 @@ export function getCustomIndex(field: GraphQLField<any, any>): IndexSpec {
   }
 }
 
-// export function getRelationIndex(field: GraphQLField<any, any>): IndexSpec {
-//   const relationshipData = parseRelationshipAnnotation(field.description);
-//   if (
-//     relationshipData?.kind &&
-//     ['manyToOne', 'manyToMany'].includes(relationshipData.kind)
-//   ) {
-//     return {
-//       // key: {
-//       //   [relationshipData.key]: 1,
-//       // },
-//     };
-//   } else {
-//     return undefined;
-//   }
-// }
+export function getRelationIndex(
+  field: GraphQLField<any, any>,
+): Partial<IndexSpec> {
+  const relationshipData = parseRelationshipAnnotation(field.description);
+  if (
+    relationshipData?.kind &&
+    ['manyToOne', 'manyToMany'].includes(relationshipData.kind)
+  ) {
+    return {
+      name: relationshipData.field,
+    };
+  } else {
+    return undefined;
+  }
+}

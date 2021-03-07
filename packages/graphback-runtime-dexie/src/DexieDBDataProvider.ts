@@ -13,6 +13,7 @@ import {
 } from '@graphback/core';
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
+import { findAndCreateIndexes } from './utils/createIndexes';
 // interface SortOrder {
 //   [fieldName: string]: 1 | -1;
 // }
@@ -37,11 +38,13 @@ export class DexieDBDataProvider<Type = any>
 
     // FIXME: what is it and why it needed?
     this.fieldTransformMap = getFieldTransformations(model.graphqlType);
-    // findAndCreateIndexes(model.graphqlType, this.db, this.tableName).catch(
-    //   (e: Error) => {
-    //     throw e;
-    //   },
-    // );
+    findAndCreateIndexes({
+      baseType: model.graphqlType,
+      db,
+      tableName: this.tableName,
+    }).catch((e: Error) => {
+      throw e;
+    });
   }
 
   public async create(data: Type): Promise<Type> {

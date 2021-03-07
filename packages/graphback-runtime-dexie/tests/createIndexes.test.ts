@@ -1,9 +1,8 @@
-import { Context, createTestingContext } from "./__util__";
+import { IndexSpec } from 'dexie';
+import { Context, createTestingContext } from './__util__';
 
-describe('MongoDB indexing', () => {
+describe('DexieDB indexing', () => {
   let context: Context;
-
-  afterEach(() => context.server.stop())
 
   it('can create default indexes', async () => {
     context = await createTestingContext(`
@@ -22,19 +21,22 @@ describe('MongoDB indexing', () => {
       scalar GraphbackObjectID
       `);
 
-
-    const index = await context.findIndex('note', 'text');
-
-    expect(index).toMatchObject(
-      {
-        "key": {
-          "text": 1
-        },
-        "name": "text_1",
-        "ns": "test.note"
-      }
-    )
-  })
+    const index = await context.findIndex({
+      indexName: 'text',
+      tableName: 'note',
+    });
+    const expectedIndex: Partial<IndexSpec> = {
+      name: 'text_1',
+    };
+    // {
+    //   key: {
+    //     text: 1,
+    //   },
+    //   name: 'text_1',
+    //   ns: 'test.note',
+    // }
+    expect(index).toMatchObject(expectedIndex);
+  });
 
   it('can create indexes with options', async () => {
     context = await createTestingContext(`
@@ -61,19 +63,23 @@ describe('MongoDB indexing', () => {
       scalar GraphbackObjectID
       `);
 
-    const index = await context.findIndex('note', 'meta');
-
-    expect(index).toMatchObject(
-      {
-        "key": {
-          "meta": 1,
-          "pages": 1
-        },
-        "name": "compound_index",
-        "ns": "test.note"
-      }
-    )
-  })
+    const index = await context.findIndex({
+      indexName: 'note',
+      tableName: 'meta',
+    });
+    const expectedIndex: Partial<IndexSpec> = {
+      name: 'compound_index',
+    };
+    // {
+    //   key: {
+    //     meta: 1,
+    //     pages: 1,
+    //   },
+    //   name: 'compound_index',
+    //   ns: 'test.note',
+    // }
+    expect(index).toMatchObject(expectedIndex);
+  });
 
   it('can create relation indexes', async () => {
     context = await createTestingContext(`
@@ -100,16 +106,19 @@ describe('MongoDB indexing', () => {
       scalar GraphbackObjectID
       `);
 
-    const index = await context.findIndex('comment', 'noteId');
-
-    expect(index).toMatchObject(
-      {
-        "key": {
-          "noteId": 1,
-        },
-        "name": "noteId_1",
-        "ns": "test.comment"
-      }
-    )
-  })
-})
+    const index = await context.findIndex({
+      tableName: 'comment',
+      indexName: 'noteId',
+    });
+    const expectedIndex: Partial<IndexSpec> = {
+      name: 'noteId_1',
+    };
+    // {
+    //   key: {
+    //     noteId: 1,
+    //   },
+    //   ns: 'test.comment',
+    // }
+    expect(index).toMatchObject(expectedIndex);
+  });
+});

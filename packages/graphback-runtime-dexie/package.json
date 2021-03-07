@@ -43,6 +43,7 @@
     "dexie": "^3.0.3"
   },
   "devDependencies": {
+    "fake-indexeddb": "^3.1.2",
     "@graphback/codegen-schema": "1.1.2",
     "@types/jest": "26.0.19",
     "@types/node": "12.19.9",

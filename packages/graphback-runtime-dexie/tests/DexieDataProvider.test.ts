@@ -1,19 +1,18 @@
 /* eslint-disable max-lines */
-import { ObjectID } from 'mongodb';
-import { advanceTo, advanceBy } from "jest-date-mock";
-import { QueryFilter, GraphbackCoreMetadata } from '@graphback/core';
-import { Context, createTestingContext } from "./__util__";
+import { GraphbackCoreMetadata, QueryFilter } from '@graphback/core';
 import { buildSchema } from 'graphql';
-import { MongoDBDataProvider } from '../src/MongoDBDataProvider';
+import { advanceBy, advanceTo } from 'jest-date-mock';
+import { DexieDBDataProvider } from '../src/DexieDBDataProvider';
+import { Context, createTestingContext } from './__util__';
 
-describe('MongoDBDataProvider Basic CRUD', () => {
+describe('DexieDBDataProvider Basic CRUD', () => {
   interface Todo {
-    _id: ObjectID;
+    _id: string;
     text: string;
   }
   let context: Context;
 
-  const fields = ["_id", "text"];
+  const fields = ['_id', 'text'];
 
   const todoSchema = `
   """
@@ -29,22 +28,12 @@ describe('MongoDBDataProvider Basic CRUD', () => {
 
   const defaultTodoSeed = [
     {
-      text: 'todo'
+      text: 'todo',
     },
     {
-      text: 'todo2'
-    }
-  ]
-
-  afterEach(async (done) => {
-    if (context) {
-      await context.server.stop();
-    }
-
-    done();
-  })
-
-  afterEach(async () => context?.server?.stop());
+      text: 'todo2',
+    },
+  ];
 
   test('Test missing "_id: GraphbackObjectID" primary key', async () => {
     const schema = `
@@ -57,35 +46,39 @@ describe('MongoDBDataProvider Basic CRUD', () => {
     }
     `;
 
-
     const defautConfig = {
-      "create": true,
-      "update": true,
-      "findOne": true,
-      "find": true,
-      "delete": true,
-      "subCreate": true,
-      "subUpdate": true,
-      "subDelete": true
-    }
+      create: true,
+      update: true,
+      findOne: true,
+      find: true,
+      delete: true,
+      subCreate: true,
+      subUpdate: true,
+      subDelete: true,
+    };
 
     try {
-      const metadata = new GraphbackCoreMetadata({ crudMethods: defautConfig }, buildSchema(schema));
-      const models = metadata.getModelDefinitions()
+      const metadata = new GraphbackCoreMetadata(
+        { crudMethods: defautConfig },
+        buildSchema(schema),
+      );
+      const models = metadata.getModelDefinitions();
       for (const model of models) {
-        new MongoDBDataProvider(model, undefined);
+        new DexieDBDataProvider(model, undefined);
       }
       expect(true).toBeFalsy(); // should not reach here
     } catch (error) {
-      expect(error.message).toEqual('Model "MissingPrimaryKeyModel" must contain a "_id: GraphbackObjectID" primary key. Visit https://graphback.dev/docs/model/datamodel#mongodb to see how to set up one for your MongoDB model.');
+      expect(error.message).toEqual(
+        'Model "MissingPrimaryKeyModel" must contain a "_id: GraphbackObjectID" primary key. Visit https://graphback.dev/docs/model/datamodel#dexiedb to see how to set up one for your dexieDB model.',
+      );
     }
   });
 
-  test('Test mongo crud', async () => {
+  test('Test dexie crud', async () => {
     context = await createTestingContext(todoSchema, {
       seedData: {
-        Todos: defaultTodoSeed
-      }
+        Todos: defaultTodoSeed,
+      },
     });
     let todo: Todo = await context.providers.Todos.create({
       text: 'create a todo',
@@ -93,26 +86,34 @@ describe('MongoDBDataProvider Basic CRUD', () => {
 
     expect(todo.text).toEqual('create a todo');
 
-    todo = await context.providers.Todos.update({
-      _id: todo._id,
-      text: 'my updated first todo',
-    }, fields);
+    todo = await context.providers.Todos.update(
+      {
+        _id: todo._id,
+        text: 'my updated first todo',
+      },
+      fields,
+    );
 
     expect(todo.text).toEqual('my updated first todo');
 
-    const data = await context.providers.Todos.delete({ _id: todo._id }, fields);
+    const data = await context.providers.Todos.delete(
+      { _id: todo._id },
+      fields,
+    );
 
     expect(data._id).toEqual(todo._id);
   });
 
-
   test('find first 1 todo(s) excluding first todo', async () => {
     context = await createTestingContext(todoSchema, {
       seedData: {
-        Todos: defaultTodoSeed
-      }
+        Todos: defaultTodoSeed,
+      },
     });
-    const todos = await context.providers.Todos.findBy({ page: { limit: 1, offset: 1 } }, ["text"]);
+    const todos = await context.providers.Todos.findBy(
+      { page: { limit: 1, offset: 1 } },
+      ['text'],
+    );
 
     // check that count is total number of seeded Todos
     const count = await context.providers.Todos.count({});
@@ -127,27 +128,30 @@ describe('MongoDBDataProvider Basic CRUD', () => {
   test('find Todo by text', async () => {
     context = await createTestingContext(todoSchema, {
       seedData: {
-        Todos: defaultTodoSeed
-      }
+        Todos: defaultTodoSeed,
+      },
     });
     const all = await context.providers.Todos.findBy();
-    const todos: Todo[] = await context.providers.Todos.findBy({
-      filter: {
-        text: { eq: all[0].text },
-      }
-    }, ["_id"]);
+    const todos: Todo[] = await context.providers.Todos.findBy(
+      {
+        filter: {
+          text: { eq: all[0].text },
+        },
+      },
+      ['_id'],
+    );
     expect(todos.length).toBeGreaterThan(0);
     const count = await context.providers.Todos.count({
-      text: { eq: all[0].text }
-    })
+      text: { eq: all[0].text },
+    });
     expect(count).toEqual(todos.length);
   });
 
   test('find Todo by text, limit defaults to complete set', async () => {
     context = await createTestingContext(todoSchema, {
       seedData: {
-        Todos: defaultTodoSeed
-      }
+        Todos: defaultTodoSeed,
+      },
     });
     const text = 'todo-test';
     for (let i = 0; i < 11; i++) {
@@ -155,7 +159,10 @@ describe('MongoDBDataProvider Basic CRUD', () => {
         text,
       });
     }
-    const todos: Todo[] = await context.providers.Todos.findBy({ filter: { text: { eq: text } }, page: { offset: 0 } }, fields);
+    const todos: Todo[] = await context.providers.Todos.findBy(
+      { filter: { text: { eq: text } }, page: { offset: 0 } },
+      fields,
+    );
 
     expect(todos.length).toEqual(11);
 
@@ -166,8 +173,8 @@ describe('MongoDBDataProvider Basic CRUD', () => {
   test('find by text offset defaults to 0', async () => {
     context = await createTestingContext(todoSchema, {
       seedData: {
-        Todos: defaultTodoSeed
-      }
+        Todos: defaultTodoSeed,
+      },
     });
     const text = 'todo-test';
     for (let i = 0; i < 2; i++) {
@@ -175,15 +182,18 @@ describe('MongoDBDataProvider Basic CRUD', () => {
         text,
       });
     }
-    const todos: Todo[] = await context.providers.Todos.findBy({ filter: { text: { eq: text } }, page: { limit: 1 } }, fields);
+    const todos: Todo[] = await context.providers.Todos.findBy(
+      { filter: { text: { eq: text } }, page: { limit: 1 } },
+      fields,
+    );
     expect(todos[0].text).toEqual(text);
   });
 
   test('find first 1 todos by text', async () => {
     context = await createTestingContext(todoSchema, {
       seedData: {
-        Todos: defaultTodoSeed
-      }
+        Todos: defaultTodoSeed,
+      },
     });
     const text = 'todo-test';
     for (let i = 0; i < 2; i++) {
@@ -192,12 +202,15 @@ describe('MongoDBDataProvider Basic CRUD', () => {
       });
     }
 
-    const todos: Todo[] = await context.providers.Todos.findBy({
-      filter: {
-        text: { eq: text }
+    const todos: Todo[] = await context.providers.Todos.findBy(
+      {
+        filter: {
+          text: { eq: text },
+        },
+        page: { limit: 1, offset: 0 },
       },
-      page: { limit: 1, offset: 0 }
-    }, fields);
+      fields,
+    );
     expect(todos.length).toEqual(1);
     expect(todos[0].text).toEqual(text);
   });
@@ -211,11 +224,14 @@ describe('MongoDBDataProvider Basic CRUD', () => {
           { text: 'todo4' },
           { text: 'todo2' },
           { text: 'todo5' },
-        ]
-      }
+        ],
+      },
     });
 
-    const todos = await context.providers.Todos.findBy({ filter: { text: { contains: 'todo' } }, orderBy: { field: 'text' } }, fields);
+    const todos = await context.providers.Todos.findBy(
+      { filter: { text: { contains: 'todo' } }, orderBy: { field: 'text' } },
+      fields,
+    );
     for (let t = 0; t < todos.length; t++) {
       expect(todos[t].text).toEqual(`todo${t + 1}`);
     }
@@ -230,11 +246,17 @@ describe('MongoDBDataProvider Basic CRUD', () => {
           { text: 'todo4' },
           { text: 'todo2' },
           { text: 'todo5' },
-        ]
-      }
+        ],
+      },
     });
 
-    const todos = await context.providers.Todos.findBy({ filter: { text: { contains: 'todo' } }, orderBy: { field: 'text', order: 'desc' } }, fields);
+    const todos = await context.providers.Todos.findBy(
+      {
+        filter: { text: { contains: 'todo' } },
+        orderBy: { field: 'text', order: 'desc' },
+      },
+      fields,
+    );
     for (let t = 0; t < todos.length; t++) {
       expect(todos[t].text).toEqual(`todo${5 - t}`);
     }
@@ -259,7 +281,7 @@ describe('MongoDBDataProvider Basic CRUD', () => {
     const res = await context.providers.Note.create({ text: 'asdf' });
     expect(res.createdAt).toEqual(cDate.getTime());
     expect(res.createdAt).toEqual(res.updatedAt);
-  })
+  });
 
   test('updatedAt', async () => {
     context = await createTestingContext(`
@@ -281,18 +303,22 @@ describe('MongoDBDataProvider Basic CRUD', () => {
     expect(res.updatedAt).toEqual(createDate.getTime());
 
     advanceBy(3000);
-    const next = await context.providers.Note.update({
-      ...res,
-      text: 'asdftrains'
-    }, ["updatedAt", "createdAt"]);
+    const next = await context.providers.Note.update(
+      {
+        ...res,
+        text: 'asdftrains',
+      },
+      ['updatedAt', 'createdAt'],
+    );
 
     const updateDate = new Date();
     expect(next.updatedAt).toEqual(updateDate.getTime());
-    expect(next.createdAt).toEqual(createDate.getTime())
-  })
+    expect(next.createdAt).toEqual(createDate.getTime());
+  });
 
   test('select only requested fields', async () => {
-    context = await createTestingContext(`
+    context = await createTestingContext(
+      `
     """
     @model
     """
@@ -302,17 +328,19 @@ describe('MongoDBDataProvider Basic CRUD', () => {
      description: String
     }
     scalar GraphbackObjectID
-    `, {
-      seedData: {
-        Todos: [
-          { text: 'todo1', description: "first todo" },
-          { text: 'todo2', description: "second todo" },
-          { text: 'todo3', description: "third todo" }
-        ]
-      }
-    });
+    `,
+      {
+        seedData: {
+          Todos: [
+            { text: 'todo1', description: 'first todo' },
+            { text: 'todo2', description: 'second todo' },
+            { text: 'todo3', description: 'third todo' },
+          ],
+        },
+      },
+    );
 
-    const todos = await context.providers.Todos.findBy({}, ["_id", "text"]);
+    const todos = await context.providers.Todos.findBy({}, ['_id', 'text']);
 
     expect(todos.length).toEqual(3);
     todos.forEach((todo: any) => {
@@ -321,21 +349,31 @@ describe('MongoDBDataProvider Basic CRUD', () => {
       expect(todo.description).toBeUndefined(); // should be undefined since not selected
     });
 
-    const createdTodo = await context.providers.Todos.create({ text: "new todo", description: "todo add description" });
+    const createdTodo = await context.providers.Todos.create({
+      text: 'new todo',
+      description: 'todo add description',
+    });
     expect(createdTodo._id).toBeDefined();
 
-    const updatedTodo = await context.providers.Todos.update({ _id: createdTodo._id, text: "updated todo" }, ["text"]);
+    const updatedTodo = await context.providers.Todos.update(
+      { _id: createdTodo._id, text: 'updated todo' },
+      ['text'],
+    );
     expect(updatedTodo.description).toBeUndefined();
-    expect(updatedTodo.text).toEqual("updated todo");
+    expect(updatedTodo.text).toEqual('updated todo');
 
-    const deletedTodo = await context.providers.Todos.update({ _id: createdTodo._id }, ["_id", "text", "description"]);
+    const deletedTodo = await context.providers.Todos.update(
+      { _id: createdTodo._id },
+      ['_id', 'text', 'description'],
+    );
     expect(deletedTodo._id).toEqual(createdTodo._id);
-    expect(deletedTodo.text).toEqual("updated todo");
-    expect(deletedTodo.description).toEqual("todo add description");
+    expect(deletedTodo.text).toEqual('updated todo');
+    expect(deletedTodo.description).toEqual('todo add description');
   });
 
   test('get todos with field value not in a given arrray argument', async () => {
-    context = await createTestingContext(`"""
+    context = await createTestingContext(
+      `"""
     @model
     """
     type Todo {
@@ -343,34 +381,35 @@ describe('MongoDBDataProvider Basic CRUD', () => {
      items: Int
     }
     scalar GraphbackObjectID
-    `, {
-      seedData: {
-        Todo: [
-          {
-            items: 1,
-          },
-          {
-            items: 2,
-          },
-          {
-            items: 3
-          },
-          {
-            items: 4
-          },
-          {
-            items: 5
-          },
-          {
-            items: 6
-          },
-          {
-            items: 8
-          }
-        ]
-      }
-    });
-
+    `,
+      {
+        seedData: {
+          Todo: [
+            {
+              items: 1,
+            },
+            {
+              items: 2,
+            },
+            {
+              items: 3,
+            },
+            {
+              items: 4,
+            },
+            {
+              items: 5,
+            },
+            {
+              items: 6,
+            },
+            {
+              items: 8,
+            },
+          ],
+        },
+      },
+    );
 
     const { providers } = context;
 
@@ -388,17 +427,18 @@ describe('MongoDBDataProvider Basic CRUD', () => {
       filter: {
         not: {
           items: {
-            in: [newTodoItems]
-          }
-        }
-      }
+            in: [newTodoItems],
+          },
+        },
+      },
     });
 
     expect(oldTodos).toEqual(allTodos); // assert that we did not retrieve the newly added todo item
   });
 
   it('a && (b || c)', async () => {
-    context = await createTestingContext(`
+    context = await createTestingContext(
+      `
     scalar GraphbackObjectID
 
     """
@@ -410,49 +450,52 @@ describe('MongoDBDataProvider Basic CRUD', () => {
       b: Int
       c: Int
     }
-    `, {
-      seedData: {
-        Todo: [
-          {
-            a: 1,
-            b: 5,
-            c: 8
-          },
-          {
-            a: 1,
-            b: 2,
-            c: 10
-          },
-          {
-            a: 1,
-            b: 5,
-            c: 3
-          },
-          {
-            a: 6,
-            b: 6,
-            c: 3
-          }
-        ]
-      }
-    })
+    `,
+      {
+        seedData: {
+          Todo: [
+            {
+              a: 1,
+              b: 5,
+              c: 8,
+            },
+            {
+              a: 1,
+              b: 2,
+              c: 10,
+            },
+            {
+              a: 1,
+              b: 5,
+              c: 3,
+            },
+            {
+              a: 6,
+              b: 6,
+              c: 3,
+            },
+          ],
+        },
+      },
+    );
 
     const filter: QueryFilter = {
       a: {
-        eq: 1
+        eq: 1,
       },
       or: [
         {
           c: {
-            eq: 6
-          }
-        }, {
+            eq: 6,
+          },
+        },
+        {
           b: {
-            eq: 5
-          }
-        }
-      ]
-    }
+            eq: 5,
+          },
+        },
+      ],
+    };
 
     const items = await context.providers.Todo.findBy({ filter });
 
@@ -460,7 +503,8 @@ describe('MongoDBDataProvider Basic CRUD', () => {
   });
 
   it('a && (b || c) starting at first $or', async () => {
-    context = await createTestingContext(`
+    context = await createTestingContext(
+      `
     scalar GraphbackObjectID
 
     """
@@ -472,53 +516,56 @@ describe('MongoDBDataProvider Basic CRUD', () => {
       b: Int
       c: Int
     }
-    `, {
-      seedData: {
-        Todo: [
-          {
-            a: 1,
-            b: 5,
-            c: 8
-          },
-          {
-            a: 1,
-            b: 2,
-            c: 10
-          },
-          {
-            a: 1,
-            b: 5,
-            c: 3
-          },
-          {
-            a: 6,
-            b: 6,
-            c: 3
-          }
-        ]
-      }
-    })
+    `,
+      {
+        seedData: {
+          Todo: [
+            {
+              a: 1,
+              b: 5,
+              c: 8,
+            },
+            {
+              a: 1,
+              b: 2,
+              c: 10,
+            },
+            {
+              a: 1,
+              b: 5,
+              c: 3,
+            },
+            {
+              a: 6,
+              b: 6,
+              c: 3,
+            },
+          ],
+        },
+      },
+    );
 
     const filter: QueryFilter = {
       or: [
         {
           a: {
-            eq: 1
+            eq: 1,
           },
           or: [
             {
               c: {
-                eq: 6
-              }
-            }, {
+                eq: 6,
+              },
+            },
+            {
               b: {
-                eq: 5
-              }
-            }
-          ]
-        }
-      ]
-    }
+                eq: 5,
+              },
+            },
+          ],
+        },
+      ],
+    };
 
     const items = await context.providers.Todo.findBy({ filter });
 
@@ -526,7 +573,8 @@ describe('MongoDBDataProvider Basic CRUD', () => {
   });
 
   it('a && (c || b) from nested $or', async () => {
-    context = await createTestingContext(`
+    context = await createTestingContext(
+      `
     scalar GraphbackObjectID
 
     """
@@ -538,53 +586,56 @@ describe('MongoDBDataProvider Basic CRUD', () => {
       b: Int
       c: Int
     }
-    `, {
-      seedData: {
-        Todo: [
-          {
-            a: 1,
-            b: 1,
-            c: 8
-          },
-          {
-            a: 9,
-            b: 2,
-            c: 10
-          },
-          {
-            a: 1,
-            b: 5,
-            c: 3
-          },
-          {
-            a: 1,
-            b: 6,
-            c: 6
-          }
-        ]
-      }
-    });
+    `,
+      {
+        seedData: {
+          Todo: [
+            {
+              a: 1,
+              b: 1,
+              c: 8,
+            },
+            {
+              a: 9,
+              b: 2,
+              c: 10,
+            },
+            {
+              a: 1,
+              b: 5,
+              c: 3,
+            },
+            {
+              a: 1,
+              b: 6,
+              c: 6,
+            },
+          ],
+        },
+      },
+    );
 
     const filter: QueryFilter = {
       or: [
         {
           a: {
-            eq: 1
+            eq: 1,
           },
           or: [
             {
               c: {
-                eq: 6
-              }
-            }, {
+                eq: 6,
+              },
+            },
+            {
               b: {
-                eq: 5
-              }
-            }
-          ]
-        }
-      ]
-    }
+                eq: 5,
+              },
+            },
+          ],
+        },
+      ],
+    };
 
     const items = await context.providers.Todo.findBy({ filter });
 
@@ -592,7 +643,8 @@ describe('MongoDBDataProvider Basic CRUD', () => {
   });
 
   it('a || a || a', async () => {
-    context = await createTestingContext(`
+    context = await createTestingContext(
+      `
     scalar GraphbackObjectID
 
     """
@@ -604,60 +656,63 @@ describe('MongoDBDataProvider Basic CRUD', () => {
       b: Int
       c: Int
     }
-    `, {
-      seedData: {
-        Todo: [
-          {
-            a: 1,
-            b: 5,
-            c: 8
-          },
-          {
-            a: 2,
-            b: 2,
-            c: 10
-          },
-          {
-            a: 3,
-            b: 5,
-            c: 3
-          },
-          {
-            a: 6,
-            b: 6,
-            c: 3
-          }
-        ]
-      }
-    });
+    `,
+      {
+        seedData: {
+          Todo: [
+            {
+              a: 1,
+              b: 5,
+              c: 8,
+            },
+            {
+              a: 2,
+              b: 2,
+              c: 10,
+            },
+            {
+              a: 3,
+              b: 5,
+              c: 3,
+            },
+            {
+              a: 6,
+              b: 6,
+              c: 3,
+            },
+          ],
+        },
+      },
+    );
 
     const filter: QueryFilter = {
       or: [
         {
           a: {
-            eq: 1
-          }
+            eq: 1,
+          },
         },
         {
           a: {
-            eq: 2
-          }
+            eq: 2,
+          },
         },
         {
           a: {
-            eq: 3
-          }
-        }
-      ]
-    }
+            eq: 3,
+          },
+        },
+      ],
+    };
 
     const items = await context.providers.Todo.findBy({ filter });
 
-    expect(items).toHaveLength(3)
-  })
+    expect(items).toHaveLength(3);
+  });
 
   it('a || (a && b)', async () => {
-    context = await createTestingContext(`
+    context = await createTestingContext(
+      `
     scalar GraphbackObjectID
 
     """
@@ -669,57 +724,59 @@ describe('MongoDBDataProvider Basic CRUD', () => {
       b: Int
       c: Int
     }
-    `, {
-      seedData: {
-        Todo: [
-          {
-            a: 1,
-            b: 5,
-            c: 8
-          },
-          {
-            a: 2,
-            b: 3,
-            c: 10
-          },
-          {
-            a: 2,
-            b: 3,
-            c: 3
-          },
-          {
-            a: 6,
-            b: 6,
-            c: 3
-          }
-        ]
-      }
-    });
+    `,
+      {
+        seedData: {
+          Todo: [
+            {
+              a: 1,
+              b: 5,
+              c: 8,
+            },
+            {
+              a: 2,
+              b: 3,
+              c: 10,
+            },
+            {
+              a: 2,
+              b: 3,
+              c: 3,
+            },
+            {
+              a: 6,
+              b: 6,
+              c: 3,
+            },
+          ],
+        },
+      },
+    );
 
     const filter: QueryFilter = {
       or: [
         {
           a: {
-            eq: 1
+            eq: 1,
           },
         },
         {
           or: [
             {
               a: {
-                eq: 2
+                eq: 2,
               },
               b: {
-                eq: 3
-              }
-            }
-          ]
-        }
-      ]
-    }
+                eq: 3,
+              },
+            },
+          ],
+        },
+      ],
+    };
 
     const items = await context.providers.Todo.findBy({ filter });
 
-    expect(items).toHaveLength(3)
-  })
+    expect(items).toHaveLength(3);
+  });
 });
