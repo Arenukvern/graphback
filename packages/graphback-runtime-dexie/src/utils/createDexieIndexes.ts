@@ -89,10 +89,10 @@ export const getIndexedFieldsString = (
 };
 
 export async function applyIndexes({ tableName, db, indexes }: ApplyIndexes) {
-  if (indexes.length === 0) return;
-
   try {
     const strIndexedFields = getIndexedFieldsString(indexes);
+    if (strIndexedFields.length === 0)
+      throw Error('At least one primary key must bew defined.');
     db.version(db.verno == null || db.verno < 1 ? 1 : db.verno).stores({
       [tableName]: strIndexedFields,
     });
@@ -127,6 +127,7 @@ export function getIndexFields(
   baseType: GraphQLObjectType,
 ): Partial<IndexSpec>[] {
   const res: Partial<IndexSpec>[] = [];
+  const reserveFieldPrimaryKeys: Partial<IndexSpec>[] = [];
   const fields = baseType.getFields();
   for (const field of Object.values(fields)) {
     // Add Index on relation fields
@@ -141,6 +142,21 @@ export function getIndexFields(
     if (customIndex !== undefined) {
       res.push(customIndex);
     }
+    const type = JSON.parse(JSON.stringify(field.type));
+    if (type == 'GraphbackObjectID!') {
+      const maybeId = { name: field.name, unique: true };
+      if (field.name === '_id' || field.name === 'id') {
+        res.push(maybeId);
+      } else {
+        reserveFieldPrimaryKeys.push(maybeId);
+      }
+    }
+  }
+  if (res.length == 0) {
+    if (reserveFieldPrimaryKeys.length == 0)
+      throw Error('Model must have at least one primary key!');
+    // push if any keys were reserved
+    res.push(reserveFieldPrimaryKeys[0]);
   }
   return res;
 }

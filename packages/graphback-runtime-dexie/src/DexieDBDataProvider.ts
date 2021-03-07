@@ -14,6 +14,8 @@ import {
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
+var ObjectID = require('bson-objectid');
+
 // interface SortOrder {
 //   [fieldName: string]: 1 | -1;
 // }
@@ -48,9 +50,20 @@ export class DexieDBDataProvider<Type = any>
   }
 
   public async create(data: Type): Promise<Type> {
+    const { data: createData, idField } = getDatabaseArguments(
+      this.tableMap,
+      data,
+    );
     // getting id field name
-    const { data: createData } = getDatabaseArguments(this.tableMap, data);
-    const table = this.db.table<Type, string>(this.tableName);
+    if (idField.value == null) {
+      // if id is empty generate new one, as Dexie will no generate it
+      // and auto increment is too simple. But IndexedDb not supported
+      // ObjectId as primary key, so we will use id of IndexedDb
+      // see more https://bugzilla.mozilla.org/show_bug.cgi?id=1357636
+      idField.value = ObjectID().id;
+      createData[idField.name] = idField.value;
+    }
+    const table = this.getTable();
     const maybeId: Maybe<string> = await table.add(createData);
     if (maybeId) return await table.get(maybeId);
 
@@ -97,7 +110,7 @@ export class DexieDBDataProvider<Type = any>
     }
     try {
       const table = this.getTable();
-      const id = data[idField.value];
+      const id = data[idField.name];
       const dbType = await (async () => {
         const dbObj = await table.get(id);
         return this.getSelectedFieldsFromType(selectedFields, dbObj);

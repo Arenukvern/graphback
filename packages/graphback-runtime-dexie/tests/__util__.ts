@@ -58,7 +58,8 @@ export async function createTestingContext(
     const tableNames = Object.keys(config.seedData);
     for (const tableName of tableNames) {
       for (const element of config.seedData[tableName]) {
-        await providers[tableName].create(element);
+        const provider = providers[tableName];
+        await provider?.create(element);
       }
     }
   }
