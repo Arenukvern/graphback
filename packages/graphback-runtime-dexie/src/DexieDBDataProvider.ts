@@ -10,6 +10,7 @@ import {
   ModelTableMap,
   NoDataError,
   QueryFilter,
+  TableID
 } from '@graphback/core';
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
@@ -54,15 +55,7 @@ export class DexieDBDataProvider<Type = any>
       this.tableMap,
       data,
     );
-    // getting id field name
-    if (idField.value == null) {
-      // if id is empty generate new one, as Dexie will no generate it
-      // and auto increment is too simple. But IndexedDb not supported
-      // ObjectId as primary key, so we will use id of IndexedDb
-      // see more https://bugzilla.mozilla.org/show_bug.cgi?id=1357636
-      idField.value = ObjectID().id;
-      createData[idField.name] = idField.value;
-    }
+    this.fixObjectIdForDexie(createData, idField)
     const table = this.getTable();
     const maybeId: Maybe<string> = await table.add(createData);
     if (maybeId) return await table.get(maybeId);
@@ -84,6 +77,8 @@ export class DexieDBDataProvider<Type = any>
         `Cannot update ${this.tableName} - missing ID field`,
       );
     }
+    
+    this.fixObjectIdForDexie(updateData, idField)
 
     const table = this.getTable();
     const maybeId = await table.put(updateData);
@@ -102,12 +97,16 @@ export class DexieDBDataProvider<Type = any>
     selectedFields?: string[],
   ): Promise<Type> {
     const { idField } = getDatabaseArguments(this.tableMap, data);
+    
 
     if (!idField.value) {
       throw new NoDataError(
         `Cannot delete ${this.tableName} - missing ID field`,
       );
     }
+    
+    this.fixObjectIdForDexie(data, idField)
+    
     try {
       const table = this.getTable();
       const id = data[idField.name];
@@ -146,6 +145,15 @@ export class DexieDBDataProvider<Type = any>
     _args?: FindByArgs,
     _selectedFields?: string[],
   ): Promise<Type[]> {
+    /**
+     * How it works:
+     * - If the search in indexed field, then
+     * it uses Dexie WhereCause
+     * - If the search in non indexed field, then 
+     * it uses Dexie filter
+     */
+    const table = this.getTable()
+    table.where().
     // const filterQuery = buildQuery(args?.filter);
 
     // const compare = (arg: Partial<Type>) => {
@@ -222,6 +230,24 @@ export class DexieDBDataProvider<Type = any>
   }
   protected getSelectedFields(selectedFields: string[]) {
     return selectedFields?.length ? selectedFields : '*';
+  }
+  protected fixObjectIdForDexie(data: Partial<Type>,idField: TableID){
+    // getting id field name
+    if (idField.value == null) {
+      // if id is empty generate new one, as Dexie will no generate it
+      // and auto increment is too simple. But IndexedDb not supported
+      // ObjectId as primary key, so we will use id of IndexedDb
+      // see more https://bugzilla.mozilla.org/show_bug.cgi?id=1357636
+      idField.value = ObjectID().id;
+      data[idField.name] = idField.value;
+    } else {
+      // handle case if id already an objectId
+      const isValid = ObjectID.isValid(idField.value)
+      if(isValid){
+        idField.value = idField.value.id
+        data[idField.name] = idField.value
+      } 
+    }
   }
   protected getSelectedFieldsFromType(selectedFields: string[], type: Type) {
     const obj = {};
