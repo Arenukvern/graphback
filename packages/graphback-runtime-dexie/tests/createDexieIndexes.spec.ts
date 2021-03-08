@@ -1,5 +1,5 @@
 import { IndexSpec } from 'dexie';
-import { findDexieTableFieldIndex } from '../src/utils/createDexieIndexes';
+import { findDexieTableFieldIndex } from '../src';
 import { Context, createTestingContext } from './__util__';
 
 describe('DexieDB indexing', () => {

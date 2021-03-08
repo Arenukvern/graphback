@@ -1,7 +1,7 @@
 import { GraphbackCoreMetadata } from '@graphback/core';
 import { ObjectID } from 'bson';
 import { buildSchema } from 'graphql';
-import { DexieDBDataProvider } from '../src/DexieDBDataProvider';
+import { DexieDBDataProvider } from '../src';
 import { Context, createTestingContext } from './__util__';
 
 describe('DexieDBDataProvider Basic CRUD', () => {

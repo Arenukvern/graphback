@@ -6,7 +6,7 @@ import {
   GraphbackQueryOperator,
   RootQueryOperator,
   validateTableEntry,
-} from '../src/dexieQueryBuilder';
+} from '../src';
 import { Context, createTestingContext } from './__util__';
 describe('DexieDBDataProvider Query Builder', () => {
   let context: Context;
