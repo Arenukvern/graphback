@@ -151,47 +151,47 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     expect(count).toEqual(todos.length);
   });
 
-  // test('find Todo by text, limit defaults to complete set', async () => {
-  //   context = await createTestingContext(todoSchema, {
-  //     seedData: {
-  //       Todos: defaultTodoSeed,
-  //     },
-  //   });
-  //   const text = 'todo-test';
-  //   for (let i = 0; i < 11; i++) {
-  //     await context.providers.Todos.create({
-  //       text,
-  //     });
-  //   }
-  //   const todos: Todo[] = await context.providers.Todos.findBy(
-  //     { filter: { text: { eq: text } }, page: { offset: 0 } },
-  //     fields,
-  //   );
+  test('find Todo by text, limit defaults to complete set', async () => {
+    context = await createTestingContext(todoSchema, {
+      seedData: {
+        Todos: defaultTodoSeed,
+      },
+    });
+    const text = 'todo-test';
+    for (let i = 0; i < 11; i++) {
+      await context.providers.Todos.create({
+        text,
+      });
+    }
+    const todos: Todo[] = await context.providers.Todos.findBy(
+      { filter: { text: { eq: text } }, page: { offset: 0 } },
+      fields,
+    );
 
-  //   expect(todos.length).toEqual(11);
+    expect(todos.length).toEqual(11);
 
-  //   const count = await context.providers.Todos.count({ text: { eq: text } });
-  //   expect(count).toEqual(11);
-  // });
+    const count = await context.providers.Todos.count({ text: { eq: text } });
+    expect(count).toEqual(11);
+  });
 
-  // test('find by text offset defaults to 0', async () => {
-  //   context = await createTestingContext(todoSchema, {
-  //     seedData: {
-  //       Todos: defaultTodoSeed,
-  //     },
-  //   });
-  //   const text = 'todo-test';
-  //   for (let i = 0; i < 2; i++) {
-  //     await context.providers.Todos.create({
-  //       text,
-  //     });
-  //   }
-  //   const todos: Todo[] = await context.providers.Todos.findBy(
-  //     { filter: { text: { eq: text } }, page: { limit: 1 } },
-  //     fields,
-  //   );
-  //   expect(todos[0].text).toEqual(text);
-  // });
+  test('find by text offset defaults to 0', async () => {
+    context = await createTestingContext(todoSchema, {
+      seedData: {
+        Todos: defaultTodoSeed,
+      },
+    });
+    const text = 'todo-test';
+    for (let i = 0; i < 2; i++) {
+      await context.providers.Todos.create({
+        text,
+      });
+    }
+    const todos: Todo[] = await context.providers.Todos.findBy(
+      { filter: { text: { eq: text } }, page: { limit: 1 } },
+      fields,
+    );
+    expect(todos[0].text).toEqual(text);
+  });
 
   // test('find first 1 todos by text', async () => {
   //   context = await createTestingContext(todoSchema, {
