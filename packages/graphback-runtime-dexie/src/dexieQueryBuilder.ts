@@ -1,7 +1,7 @@
 import { QueryFilter, TableID } from '@graphback/core';
-import { WhereClause } from 'dexie';
 import * as escapeRegex from 'escape-string-regexp';
 import { Maybe } from 'graphql/jsutils/Maybe';
+import { DexieDBDataProvider } from './DexieDBDataProvider';
 
 type RootQueryOperator = '$and' | '$or' | '$not';
 const operators = [
@@ -157,21 +157,24 @@ function mapQueryFilterToMongoFilterQuery(filter: any) {
   return filter;
 }
 
+interface QueryBuilder<TType> {
+  filter: QueryFilter<TType>;
+  fieldId: TableID;
+  provider: DexieDBDataProvider<TType>;
+}
+
 /**
  * Work principle:
- * 1. Flat filter to DexieQueryMap
- * 2. Execute DexieQueryMap
+ * 1. Flat filter to DexieQueryMap (QueryBuilder)
+ * 2. Execute DexieQueryMap (QueryRunner)
  * @param filter
  */
 export const queryBuilder = <TType>({
   filter,
   fieldId,
-  table,
-}: {
-  filter: QueryFilter<TType>;
-  fieldId: TableID;
-  table: Dexie.Table;
-}) => {
+  provider,
+}: // TODO: add return type
+QueryBuilder<TType>) => {
   const dexieQueryMap: DexieQueryMap = {};
   if (isPrimitive(filter)) {
     dexieQueryMap[fieldId.name] = {
@@ -190,11 +193,13 @@ export const queryBuilder = <TType>({
           // suppose that field is table.field name
           // then we need to:
           // TODO: check is this field indexed
-
+          const isFieldIndexed = provider['isFieldIndexed'](field);
           // TODO: get query operator
           // TODO: get value
           dexieQueryMap[field] = {
-            isIndexed: false,
+            isIndexed: isFieldIndexed,
+            // FIXME: when WhereClause will be ready replace to
+            // isFieldIndexed ? DexieFilterTypes.WhereClause : DexieFilterTypes.Filter
             filterType: DexieFilterTypes.Filter,
             value,
           };
@@ -209,8 +214,7 @@ export const queryBuilder = <TType>({
  *
  * @param {QueryFilter} filter
  */
-export function buildQuery<TType = any>(
-  filter: QueryFilter<TType>,
-): WhereClause<any> {
-  return mapQueryFilterToMongoFilterQuery(filter);
-}
+export const buildQuery = <TType = any>(
+  arg: QueryBuilder<TType>,
+  // TODO: add return type
+) => queryBuilder(arg);
