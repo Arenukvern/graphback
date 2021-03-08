@@ -422,7 +422,7 @@ export class DexieDBDataProvider<Type = any>
       query = query.slice(offset);
     } else if (offset && limit) {
       query = query.slice(offset, limit + offset);
-    } else if (offset == null && limit != null) {
+    } else if ((offset == null || offset == 0) && limit != null) {
       query.length = limit;
     }
 
