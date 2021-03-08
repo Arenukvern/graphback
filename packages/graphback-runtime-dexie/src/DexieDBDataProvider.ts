@@ -6,6 +6,8 @@ import {
   getDatabaseArguments,
   getFieldTransformations,
   GraphbackDataProvider,
+  GraphbackOrderBy,
+  GraphbackPage,
   ModelDefinition,
   ModelTableMap,
   NoDataError,
@@ -18,9 +20,9 @@ import { buildQuery, runQuery } from './dexieQueryBuilder';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
 var ObjectID = require('bson-objectid');
 
-// interface SortOrder {
-//   [fieldName: string]: 1 | -1;
-// }
+interface SortOrder {
+  [fieldName: string]: 1 | -1;
+}
 
 /**
  * Graphback provider that connnects to the Dexie database
@@ -143,7 +145,7 @@ export class DexieDBDataProvider<Type = any>
 
   public async findBy(
     args?: FindByArgs,
-    _selectedFields?: string[],
+    selectedFields?: string[],
   ): Promise<Type[]> {
     /**
      * How it should work:
@@ -166,28 +168,40 @@ export class DexieDBDataProvider<Type = any>
       provider: this,
       query: filterQuery,
     });
-    // TODO; sort result
-    // const data = await this.usePage(
-    //   this.sortQuery(query, args?.orderBy),
-    //   args?.page,
-    // );
+    const data = await this.usePage(
+      this.sortQuery(result, args?.orderBy),
+      args?.page,
+    );
 
-    // if (data) {
-    //   return data.map((el) =>
-    //     this.getSelectedFieldsFromType(selectedFields, el),
-    //   );
-    // }
-    // throw new NoDataError(
-    //   `Cannot find all results for ${
-    //     this.tableName
-    //   } with filter: ${JSON.stringify(args?.filter)}`,
-    // );
-    return [];
+    if (data) {
+      // in case if we request all properties then just return all
+      if (Object.keys(data[0]).length == selectedFields.length) {
+        return data;
+      }
+      return data.map((el) =>
+        this.getSelectedFieldsFromType(selectedFields, el),
+      );
+    }
+    throw new NoDataError(
+      `Cannot find all results for ${
+        this.tableName
+      } with filter: ${JSON.stringify(args?.filter)}`,
+    );
   }
 
-  public async count(_filter?: QueryFilter): Promise<number> {
-    // return await this.getTable().where(buildQuery(filter)).count();
-    return await this.getTable().count();
+  public async count(filter?: QueryFilter): Promise<number> {
+    const { idField } = getDatabaseArguments(this.tableMap);
+
+    const filterQuery = buildQuery({
+      filter: filter,
+      idField,
+      provider: this,
+    });
+    const result = runQuery({
+      provider: this,
+      query: filterQuery,
+    });
+    return await result.count();
   }
 
   public async batchRead(
@@ -282,51 +296,51 @@ export class DexieDBDataProvider<Type = any>
     return this.indexedFieldsSet.has(fieldName);
   }
 
-  // private sortQuery(
-  //   _query: Cursor<any>,
-  //   _orderBy: GraphbackOrderBy,
-  // ): Cursor<any> {
-  //   const sortOrder: SortOrder = {};
-  //   if (orderBy) {
-  //     if (orderBy.field) {
-  //       sortOrder[orderBy.field] = 1;
-  //     }
-  //     if (orderBy.order) {
-  //       if (orderBy.order.toLowerCase() === 'desc') {
-  //         sortOrder[orderBy.field] = -1;
-  //       }
-  //     }
-  //   }
+  private sortQuery(
+    query: Cursor<any>,
+    orderBy: GraphbackOrderBy,
+  ): Cursor<any> {
+    const sortOrder: SortOrder = {};
+    if (orderBy) {
+      if (orderBy.field) {
+        sortOrder[orderBy.field] = 1;
+      }
+      if (orderBy.order) {
+        if (orderBy.order.toLowerCase() === 'desc') {
+          sortOrder[orderBy.field] = -1;
+        }
+      }
+    }
 
-  //   return query.sort(sortOrder);
-  // }
+    return query.sort(sortOrder);
+  }
 
-  // private usePage(query: Cursor<any>, page?: GraphbackPage) {
-  //   if (!page) {
-  //     return query.toArray();
-  //   }
+  private usePage(query: Cursor<any>, page?: GraphbackPage) {
+    if (!page) {
+      return query.toArray();
+    }
 
-  //   const { offset, limit } = page;
+    const { offset, limit } = page;
 
-  //   if (offset < 0) {
-  //     throw new Error(
-  //       'Invalid offset value. Please use an offset of greater than or equal to 0 in queries',
-  //     );
-  //   }
+    if (offset < 0) {
+      throw new Error(
+        'Invalid offset value. Please use an offset of greater than or equal to 0 in queries',
+      );
+    }
 
-  //   if (limit < 1) {
-  //     throw new Error(
-  //       'Invalid limit value. Please use a limit of greater than 1 in queries',
-  //     );
-  //   }
+    if (limit < 1) {
+      throw new Error(
+        'Invalid limit value. Please use a limit of greater than 1 in queries',
+      );
+    }
 
-  //   if (limit) {
-  //     query = query.limit(limit);
-  //   }
-  //   if (offset) {
-  //     query = query.skip(offset);
-  //   }
+    if (limit) {
+      query = query.limit(limit);
+    }
+    if (offset) {
+      query = query.skip(offset);
+    }
 
-  //   return query.toArray();
-  // }
+    return query.toArray();
+  }
 }
