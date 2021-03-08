@@ -33,7 +33,7 @@ export enum GraphbackQueryOperator {
   'endsWith' = 'endsWith',
 }
 const tsGraphbackQueryOperator: Record<GraphbackQueryOperator, string> = {
-  eq: '=',
+  eq: '==',
   ne: '!=',
   lt: '<',
   le: '<=',
@@ -266,11 +266,11 @@ export const runQuery = <TType = any>({ provider, query }: RunQuery<TType>) => {
   const table = provider['getTable']();
   const queryEntires = Object.entries(query);
   table.filter((tableEntry) => {
-    const fn = compileQueryFunction({
+    const isPass = validateTableEntry({
       queryEntires,
       tableEntry,
     });
-    return fn();
+    return isPass;
   });
 };
 
@@ -342,7 +342,7 @@ export function convertFieldQueryToStringCondition({
   return { condition, prePostfix };
 }
 
-export function compileQueryFunction<TType = any>({
+export function validateTableEntry<TType = any>({
   tableEntry,
   queryEntires,
 }: {
@@ -350,7 +350,6 @@ export function compileQueryFunction<TType = any>({
   queryEntires: [DexieQueryMapParam['fieldName'], DexieQueryMapParam[]][];
 }) {
   const fnConditions: string[] = [];
-  let prePostfix = '';
   for (const [fieldName, fieldQueries] of queryEntires) {
     const filterType = fieldQueries[0].filterType;
     switch (filterType) {
@@ -371,12 +370,12 @@ export function compileQueryFunction<TType = any>({
           },
           { condition: '', prePostfix: '' },
         );
-        fnConditions.push(fnQueryCondition.condition);
+        fnConditions.push(`( ${fnQueryCondition.condition} )`);
     }
   }
-  const fnBody = `return function(){
-    return ${fnConditions.join(` ${RootQueryOperator.and} `)};
-  }`;
-  const fn = new Function(fnBody);
-  return fn;
+  const fnBody = `function(){return ${fnConditions.join(
+    ` ${tsRootQueryOperator[RootQueryOperator.and]} `,
+  )};}`;
+  const fn = new Function('return ' + fnBody);
+  return fn()();
 }

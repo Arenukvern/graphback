@@ -1,12 +1,12 @@
 /* eslint-disable max-lines */
 import {
   buildQuery,
-  compileQueryFunction,
   convertFieldQueryToStringCondition,
   DexieFilterTypes,
   DexieQueryMap,
   GraphbackQueryOperator,
   RootQueryOperator,
+  validateTableEntry,
 } from '../src/dexieQueryBuilder';
 import { Context, createTestingContext } from './__util__';
 describe('DexieDBDataProvider Query Builder', () => {
@@ -30,13 +30,21 @@ describe('DexieDBDataProvider Query Builder', () => {
 
   scalar GraphbackObjectID
   `;
-  const tableEntry = {
+  const truthyTableEntry = {
     _id: '',
     text: '',
-    title: 'FunnY EmaIls',
+    title: 'ReAd EmaIls ',
     opened: false,
     likes: 1000,
-    completedPercentage: 14,
+    completedPercentage: 24,
+  };
+  const falsyTableEntry = {
+    _id: '',
+    text: '',
+    title: 'ReAd arcHIved EmaIls ',
+    opened: false,
+    likes: 1000,
+    completedPercentage: 24,
   };
   const filter = {
     title: {
@@ -166,21 +174,32 @@ describe('DexieDBDataProvider Query Builder', () => {
         value: 'emails',
         rootOperator: RootQueryOperator.and,
       },
-      tableValue: tableEntry['title'],
+      tableValue: truthyTableEntry['title'],
     });
 
     expect(result.condition).toEqual('true');
   });
-  test('can run compile query function', async () => {
+  test('can validate table entry - pass', async () => {
     context = await createTestingContext(schemaStr);
 
     context.db.open();
-    const result = compileQueryFunction({
+    const result = validateTableEntry({
       queryEntires: Object.entries(filterQuery),
-      tableEntry: tableEntry,
+      tableEntry: truthyTableEntry,
     });
 
-    expect(result).toEqual('');
+    expect(result).toBeTruthy();
+  });
+  test('can validate table entry - not pass', async () => {
+    context = await createTestingContext(schemaStr);
+
+    context.db.open();
+    const result = validateTableEntry({
+      queryEntires: Object.entries(filterQuery),
+      tableEntry: truthyTableEntry,
+    });
+
+    expect(result).toBeFalsy();
   });
 });
 
