@@ -267,7 +267,8 @@ export class DexieDBDataProvider<Type = any>
     );
   }
   protected get indexedFieldsSet() {
-    if (this.db.isOpen()) {
+    const isOpen = this.db['_state']['isBeingOpened'];
+    if (isOpen) {
       const table = this.getTable();
       const indexesSet = new Set(table.schema.indexes.map((el) => el.name));
       indexesSet.add(table.schema.primKey.name);
