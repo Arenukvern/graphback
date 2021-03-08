@@ -16,13 +16,9 @@ import {
 } from '@graphback/core';
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
-import { buildQuery, runQuery } from './dexieQueryBuilder';
+import { buildQuery, DexieQueryMap, runQuery } from './dexieQueryBuilder';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
 var ObjectID = require('bson-objectid');
-
-interface SortOrder {
-  [fieldName: string]: 1 | -1;
-}
 
 type PushSelectedResults<TType> = (data: TType, objectsForId: TType[]) => void;
 
@@ -60,10 +56,14 @@ export class DexieDBDataProvider<Type = any>
       this.tableMap,
       data,
     );
+    if (idField == null) throw Error('no idField found');
     this.fixObjectIdForDexie(createData, idField);
     const table = this.getTable();
     const maybeId: Maybe<string> = await table.add(createData);
-    if (maybeId) return await table.get(maybeId);
+    if (maybeId) {
+      const createdType = await table.get(maybeId);
+      if (createdType) return createdType;
+    }
 
     throw new NoDataError(`Cannot create ${this.tableName}`);
   }
@@ -77,7 +77,7 @@ export class DexieDBDataProvider<Type = any>
       data,
     );
 
-    if (!idField.value) {
+    if (!idField?.value) {
       throw new NoDataError(
         `Cannot update ${this.tableName} - missing ID field`,
       );
@@ -89,10 +89,19 @@ export class DexieDBDataProvider<Type = any>
     const maybeId = await table.put(updateData);
 
     if (maybeId) {
-      const result = await table.get(maybeId, (value) =>
-        this.getSelectedFieldsFromType(selectedFields, value),
-      );
-      return result;
+      const result = await (async () => {
+        if (selectedFields) {
+          return await table.get(maybeId, (value) => {
+            return value
+              ? this.getSelectedFieldsFromType(selectedFields, value)
+              : null;
+          });
+        } else {
+          return await table.get(maybeId);
+        }
+      })();
+
+      if (result) return result;
     }
     throw new NoDataError(`Cannot update ${this.tableName}`);
   }
@@ -103,7 +112,7 @@ export class DexieDBDataProvider<Type = any>
   ): Promise<Type> {
     const { idField } = getDatabaseArguments(this.tableMap, data);
 
-    if (!idField.value) {
+    if (!idField?.value) {
       throw new NoDataError(
         `Cannot delete ${this.tableName} - missing ID field`,
       );
@@ -116,10 +125,14 @@ export class DexieDBDataProvider<Type = any>
       const id = data[idField.name];
       const dbType = await (async () => {
         const dbObj = await table.get(id);
-        return this.getSelectedFieldsFromType(selectedFields, dbObj);
+        if (selectedFields && dbObj) {
+          return this.getSelectedFieldsFromType(selectedFields, dbObj);
+        }
+        return dbObj;
       })();
       await table.delete(id);
-      return dbType;
+      if (dbType) return dbType;
+      throw Error();
     } catch (error) {
       throw new NoDataError(
         `Cannot delete ${this.tableName} with ${JSON.stringify(data)}`,
@@ -135,7 +148,11 @@ export class DexieDBDataProvider<Type = any>
 
     const data = await table.where(filter).first();
 
-    if (data) return this.getSelectedFieldsFromType(selectedFields, data);
+    if (data) {
+      return selectedFields
+        ? this.getSelectedFieldsFromType(selectedFields, data)
+        : data;
+    }
 
     throw new NoDataError(
       `Cannot find a result for ${this.tableName} with filter: ${JSON.stringify(
@@ -159,23 +176,30 @@ export class DexieDBDataProvider<Type = any>
      *
      */
     const { idField } = getDatabaseArguments(this.tableMap);
-
-    const filterQuery = buildQuery({
-      filter: args?.filter,
+    if (idField == null) throw Error('cannot find idField');
+    const filterQuery: Maybe<DexieQueryMap> = buildQuery<Type>({
+      filter: args?.filter as Maybe<QueryFilter<Type>>,
       idField,
       provider: this,
     });
-    const result = await runQuery({
-      provider: this,
-      query: filterQuery,
-    }).toArray();
+
+    const result = await (async () => {
+      if (filterQuery == null || Object.keys(filterQuery).length == 0) {
+        return this.getTable().toArray();
+      }
+      return await runQuery({
+        provider: this,
+        query: filterQuery,
+      }).toArray();
+    })();
 
     const data = this.usePage(
       this.sortQuery(result, args?.orderBy),
       args?.page,
     );
 
-    if (data) return this.getSelectedData(data, selectedFields);
+    if (data)
+      return selectedFields ? this.getSelectedData(data, selectedFields) : data;
 
     throw new NoDataError(
       `Cannot find all results for ${
@@ -186,12 +210,16 @@ export class DexieDBDataProvider<Type = any>
 
   public async count(filter?: QueryFilter): Promise<number> {
     const { idField } = getDatabaseArguments(this.tableMap);
+    if (idField == null) throw Error('cannot find idField');
 
     const filterQuery = buildQuery({
       filter: filter,
       idField,
       provider: this,
     });
+    if (filterQuery == null || Object.keys(filterQuery).length == 0) {
+      return await this.getTable().count();
+    }
     const result = runQuery({
       provider: this,
       query: filterQuery,
@@ -209,17 +237,24 @@ export class DexieDBDataProvider<Type = any>
     filter[relationField] = { in: ids };
 
     const { idField } = getDatabaseArguments(this.tableMap);
+    if (idField == null) throw Error('cannot find idField');
 
     const filterQuery = buildQuery({
       filter: filter,
       idField,
       provider: this,
     });
-    const result = await runQuery({
-      provider: this,
-      query: filterQuery,
-    }).toArray();
+    const result = await (async () => {
+      if (filterQuery == null || Object.keys(filterQuery).length == 0) {
+        return await this.getTable().toArray();
+      }
+      return await runQuery({
+        provider: this,
+        query: filterQuery,
+      }).toArray();
+    })();
     const toUseSelectedFields =
+      selectedFields != null &&
       selectedFields.length != Object.keys(result[0] ?? {}).length;
     if (result) {
       // To not force check for every loop
@@ -238,6 +273,10 @@ export class DexieDBDataProvider<Type = any>
 
       const resultsById = (() => {
         const pushRawFn: PushSelectedResults<Type> = (data, objectsForId) => {
+          if (selectedFields == null)
+            throw Error(
+              'You used wrong method. Please use pushWithSelectedFieldsFn to get results',
+            );
           const cuttedType = this.getSelectedFieldsFromType(
             selectedFields,
             data,
@@ -333,6 +372,7 @@ export class DexieDBDataProvider<Type = any>
   }
 
   private sortQuery(query: Type[], orderBy?: Maybe<GraphbackOrderBy>): Type[] {
+    if (orderBy == null) return query;
     if (orderBy.field && orderBy.field.length > 0) {
       query = query.sort((a, b) => {
         const fieldA = a[orderBy.field];
@@ -348,17 +388,17 @@ export class DexieDBDataProvider<Type = any>
     return query;
   }
 
-  private usePage(query: Type[], page?: GraphbackPage) {
+  private usePage(query: Type[], page?: Maybe<GraphbackPage>) {
     if (!page) return query;
 
     const { offset, limit } = page;
 
-    if (offset < 0)
+    if (offset != null && offset < 0)
       throw new Error(
         'Invalid offset value. Please use an offset of greater than or equal to 0 in queries',
       );
 
-    if (limit < 1)
+    if (limit != null && limit < 1)
       throw new Error(
         'Invalid limit value. Please use a limit of greater than 1 in queries',
       );

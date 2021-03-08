@@ -1,4 +1,5 @@
 import { QueryFilter, TableID } from '@graphback/core';
+import { Collection } from 'dexie';
 import * as escapeRegex from 'escape-string-regexp';
 import { Maybe } from 'graphql/jsutils/Maybe';
 import { toString } from 'lodash';
@@ -74,7 +75,7 @@ export interface DexieQueryMap {
 }
 
 interface QueryBuilder<TType> {
-  filter: QueryFilter<TType>;
+  filter: Maybe<QueryFilter<TType>>;
   idField: TableID;
   provider: DexieDBDataProvider<TType>;
 }
@@ -178,14 +179,16 @@ export const queryBuilder = <TType>({
  */
 export const buildQuery = <TType = any>(
   arg: QueryBuilder<TType>,
-  // TODO: add return type
-) => queryBuilder(arg);
+): Maybe<DexieQueryMap> => queryBuilder(arg);
 
 interface RunQuery<TType> {
   query: DexieQueryMap;
   provider: DexieDBDataProvider<TType>;
 }
-export const runQuery = <TType = any>({ provider, query }: RunQuery<TType>) => {
+export const runQuery = <TType = any>({
+  provider,
+  query,
+}: RunQuery<TType>): Collection<TType, string> => {
   const table = provider['getTable']();
   const queryEntires = Object.entries(query);
   const result = table.filter((tableEntry) => {
@@ -271,11 +274,15 @@ export function validateTableEntry<TType = any>({
   queryEntires,
 }: {
   tableEntry: TType;
-  queryEntires: [DexieQueryMapParam['fieldName'], DexieQueryMapParam[]][];
+  queryEntires: [
+    DexieQueryMapParam['fieldName'],
+    Maybe<Maybe<DexieQueryMapParam>[]>,
+  ][];
 }) {
   const fnConditions: string[] = [];
   for (const [fieldName, fieldQueries] of queryEntires) {
-    const filterType = fieldQueries[0].filterType;
+    if (fieldQueries == null) continue;
+    const filterType = fieldQueries[0]?.filterType;
     switch (filterType) {
       case DexieFilterTypes.WhereClause:
         // TODO:
@@ -285,6 +292,7 @@ export function validateTableEntry<TType = any>({
         const tableValue = tableEntry[fieldName];
         const fnQueryCondition = fieldQueries.reduce(
           (condition, fieldQuery) => {
+            if (fieldQuery == null) return condition;
             // depending from condition it can be or post or prefix
             return convertFieldQueryToStringCondition({
               tableValue,

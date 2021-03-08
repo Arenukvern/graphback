@@ -32,7 +32,7 @@ export async function findAndCreateIndexes({
 export const getIndexedFieldsString = (
   indexes: Partial<IndexSpec>[],
 ): string => {
-  const strArr: Maybe<string>[] = indexes.reduce((indexesArr, indexSpec) => {
+  const strArr = indexes.reduce<Maybe<string>[]>((indexesArr, indexSpec) => {
     if (indexSpec.compound) {
       const arr =
         indexSpec.keyPath != null && Array.isArray(indexSpec.keyPath)
@@ -97,28 +97,27 @@ export async function applyIndexes({ tableName, db, indexes }: ApplyIndexes) {
       [tableName]: strIndexedFields,
     });
   } catch (error) {
-    console.warn('applyIndexes raw error', error);
-    let message: string;
-    if (error.codeName === 'IndexOptionsConflict') {
-      // This Index exists but with a different name
-      message = `${error.errmsg}, try dropping the existing index or using the same name.`;
-    }
-    if (error.codeName === 'IndexKeySpecsConflict') {
-      // Another Index with same name exists
-      message = `${error.errmsg}, try manually dropping the existing index or using a different name.`;
-    }
-    if (error.codeName === 'InvalidIndexSpecificationOption') {
-      // Invalid options passed to @index
-      message = `${error.errmsg}, try double checking what you are passing to @index.`;
-    }
+    // let message: string;
+    // if (error.codeName === 'IndexOptionsConflict') {
+    //   // This Index exists but with a different name
+    //   message = `${error.errmsg}, try dropping the existing index or using the same name.`;
+    // }
+    // if (error.codeName === 'IndexKeySpecsConflict') {
+    //   // Another Index with same name exists
+    //   message = `${error.errmsg}, try manually dropping the existing index or using a different name.`;
+    // }
+    // if (error.codeName === 'InvalidIndexSpecificationOption') {
+    //   // Invalid options passed to @index
+    //   message = `${error.errmsg}, try double checking what you are passing to @index.`;
+    // }
 
-    if (message === undefined) {
-      message = `Graphback was unable to create the specified indexes: ${error.message}.`;
-    }
-
+    // if (message == undefined) {
+    //   message = `Graphback was unable to create the specified indexes: ${error.message}.`;
+    // }
+    // TODO: implement erorrs
     // eslint-disable-next-line no-console
     console.error(
-      `${message} If all else fails, try recreating the index manually.`,
+      `${error} If all else fails, try recreating the index manually.`,
     );
   }
 }
@@ -139,9 +138,8 @@ export function getIndexFields(
 
     // Add custom Index if found e.g. @index
     const customIndex = getCustomIndex(field);
-    if (customIndex !== undefined) {
-      res.push(customIndex);
-    }
+    if (customIndex != null) res.push(customIndex);
+
     const type = JSON.parse(JSON.stringify(field.type));
     if (type == 'GraphbackObjectID!') {
       const maybeId = { name: field.name, unique: true };
@@ -164,7 +162,9 @@ export function getIndexFields(
 export function getCustomIndex(
   field: GraphQLField<any, any>,
 ): Maybe<Partial<IndexSpec>> {
-  const indexMetadata: any = parseMetadata('index', field.description);
+  const indexMetadata = field.description
+    ? parseMetadata('index', field.description)
+    : null;
   if (indexMetadata) {
     const indexSpec: Partial<IndexSpec> = {
       name: field.name,
@@ -193,14 +193,16 @@ export function getCustomIndex(
     }
     return indexSpec;
   } else {
-    return undefined;
+    return null;
   }
 }
 
 export function getRelationIndex(
   field: GraphQLField<any, any>,
-): Partial<IndexSpec> {
-  const relationshipData = parseRelationshipAnnotation(field.description);
+): Maybe<Partial<IndexSpec>> {
+  const relationshipData = field.description
+    ? parseRelationshipAnnotation(field.description)
+    : null;
   if (
     relationshipData?.kind &&
     ['manyToOne', 'manyToMany'].includes(relationshipData.kind)
@@ -209,7 +211,7 @@ export function getRelationIndex(
       name: relationshipData.key,
     };
   } else {
-    return undefined;
+    return null;
   }
 }
 
