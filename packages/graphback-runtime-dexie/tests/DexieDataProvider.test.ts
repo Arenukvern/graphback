@@ -35,7 +35,11 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   ];
 
   afterEach(async () => {
-    if (context) await context.providers.Todos['getTable']().clear();
+    if (context) {
+      context.providers = {};
+      context.db.close();
+      context.db.delete();
+    }
   });
 
   test('Test missing "_id: GraphbackObjectID" primary key', async () => {
@@ -265,7 +269,7 @@ describe('DexieDBDataProvider Basic CRUD', () => {
       expect(todos[t].text).toEqual(`todo${5 - t}`);
     }
   });
-  // FIXME: NotFoundError: No objectStore named note in this database
+  // FIXME: createdAt& updated at are not created
   // test('createdAt', async () => {
   //   context = await createTestingContext(`
   //   """
@@ -281,12 +285,11 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //   `);
   //   const cDate = new Date(2020, 5, 26, 18, 29, 23);
   //   advanceTo(cDate);
-
   //   const res = await context.providers.Note.create({ text: 'asdf' });
   //   expect(res.createdAt).toEqual(cDate.getTime());
   //   expect(res.createdAt).toEqual(res.updatedAt);
   // });
-
+  // FIXME: createdAt& updated at are not created
   // test('updatedAt', async () => {
   //   context = await createTestingContext(`
   //   """
@@ -320,60 +323,60 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //   expect(next.createdAt).toEqual(createDate.getTime());
   // });
 
-  // test('select only requested fields', async () => {
-  //   context = await createTestingContext(
-  //     `
-  //   """
-  //   @model
-  //   """
-  //   type Todos {
-  //    _id: GraphbackObjectID!
-  //    text: String,
-  //    description: String
-  //   }
-  //   scalar GraphbackObjectID
-  //   `,
-  //     {
-  //       seedData: {
-  //         Todos: [
-  //           { text: 'todo1', description: 'first todo' },
-  //           { text: 'todo2', description: 'second todo' },
-  //           { text: 'todo3', description: 'third todo' },
-  //         ],
-  //       },
-  //     },
-  //   );
+  test('select only requested fields', async () => {
+    context = await createTestingContext(
+      `
+    """
+    @model
+    """
+    type Todos {
+     _id: GraphbackObjectID!
+     text: String,
+     description: String
+    }
+    scalar GraphbackObjectID
+    `,
+      {
+        seedData: {
+          Todos: [
+            { text: 'todo1', description: 'first todo' },
+            { text: 'todo2', description: 'second todo' },
+            { text: 'todo3', description: 'third todo' },
+          ],
+        },
+      },
+    );
 
-  //   const todos = await context.providers.Todos.findBy({}, ['_id', 'text']);
+    const todos = await context.providers.Todos.findBy({}, ['_id', 'text']);
 
-  //   expect(todos.length).toEqual(3);
-  //   todos.forEach((todo: any) => {
-  //     expect(todo._id).toBeDefined();
-  //     expect(todo.text).toBeDefined();
-  //     expect(todo.description).toBeUndefined(); // should be undefined since not selected
-  //   });
+    expect(todos.length).toEqual(3);
+    todos.forEach((todo: any) => {
+      expect(todo._id).toBeDefined();
+      expect(todo.text).toBeDefined();
+      expect(todo.description).toBeUndefined(); // should be undefined since not selected
+    });
 
-  //   const createdTodo = await context.providers.Todos.create({
-  //     text: 'new todo',
-  //     description: 'todo add description',
-  //   });
-  //   expect(createdTodo._id).toBeDefined();
+    const createdTodo = await context.providers.Todos.create({
+      text: 'new todo',
+      description: 'todo add description',
+    });
+    expect(createdTodo._id).toBeDefined();
 
-  //   const updatedTodo = await context.providers.Todos.update(
-  //     { _id: createdTodo._id, text: 'updated todo' },
-  //     ['text'],
-  //   );
-  //   expect(updatedTodo.description).toBeUndefined();
-  //   expect(updatedTodo.text).toEqual('updated todo');
+    const updatedTodo = await context.providers.Todos.update(
+      { _id: createdTodo._id, text: 'updated todo' },
+      ['text'],
+    );
+    expect(updatedTodo.description).toBeUndefined();
+    expect(updatedTodo.text).toEqual('updated todo');
 
-  //   const deletedTodo = await context.providers.Todos.update(
-  //     { _id: createdTodo._id },
-  //     ['_id', 'text', 'description'],
-  //   );
-  //   expect(deletedTodo._id).toEqual(createdTodo._id);
-  //   expect(deletedTodo.text).toEqual('updated todo');
-  //   expect(deletedTodo.description).toEqual('todo add description');
-  // });
+    const deletedTodo = await context.providers.Todos.delete(
+      { _id: createdTodo._id },
+      ['_id', 'text', 'description'],
+    );
+    expect(deletedTodo._id).toEqual(createdTodo._id);
+    expect(deletedTodo.text).toEqual('updated todo');
+    expect(deletedTodo.description).toEqual('todo add description');
+  });
 
   // test('get todos with field value not in a given arrray argument', async () => {
   //   context = await createTestingContext(

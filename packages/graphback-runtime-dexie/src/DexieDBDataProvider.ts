@@ -34,13 +34,13 @@ export class DexieDBDataProvider<Type = any>
 
   // FIXME: what is it and why it needed?
   protected fieldTransformMap: FieldTransformMap;
-
+  protected fieldSet: Set<keyof Type | string>;
   public constructor(model: ModelDefinition, db: Dexie) {
     this.verifyMongoDBPrimaryKey(model.graphqlType.name, model.primaryKey);
     this.db = db;
     this.tableMap = buildModelTableMap(model.graphqlType);
     this.tableName = this.tableMap.tableName;
-
+    this.fieldSet = new Set(Object.keys(model.fields));
     // FIXME: what is it and why it needed?
     this.fieldTransformMap = getFieldTransformations(model.graphqlType);
     findAndCreateIndexes({
@@ -77,28 +77,39 @@ export class DexieDBDataProvider<Type = any>
       this.tableMap,
       data,
     );
-
+    const castUpdatedData = updateData as Maybe<Partial<Type>>;
     if (idField?.value == null)
       throw new NoDataError(
         `Cannot update ${this.tableName} - missing ID field`,
       );
 
-    this.fixObjectIdForDexie(updateData, idField);
+    if (castUpdatedData == null)
+      throw new NoDataError(
+        `Cannot update ${this.tableName} - missing updating data`,
+      );
+
+    this.fixObjectIdForDexie(castUpdatedData, idField);
 
     const table = this.getTable();
-    const maybeId = await table.put(updateData);
-
+    const maybeId = await (async () => {
+      if (this.verifyTypeIntegrity(castUpdatedData)) {
+        return await table.put(castUpdatedData);
+      } else {
+        await table.update(idField.value, castUpdatedData);
+        return idField.value;
+      }
+    })();
     if (maybeId) {
       const result = await (async () => {
-        if (selectedFields) {
-          return await table.get(maybeId, (value) => {
-            return value
-              ? this.getSelectedFieldsFromType(selectedFields, value)
-              : null;
-          });
-        } else {
-          return await table.get(maybeId);
+        const updated = await table.get(maybeId);
+        if (updated) {
+          if (selectedFields) {
+            return this.getSelectedFieldsFromType(selectedFields, updated);
+          } else {
+            return updated;
+          }
         }
+        return null;
       })();
 
       if (result) return result;
@@ -370,6 +381,14 @@ export class DexieDBDataProvider<Type = any>
     throw Error(
       `Model "${modelName}" must contain a "_id: GraphbackObjectID" primary key. Visit https://graphback.dev/docs/model/datamodel#mongodb to see how to set up one for your MongoDB model.`,
     );
+  }
+  protected verifyTypeIntegrity(data: Partial<Type>): data is Type {
+    const fields = Object.keys(data);
+    for (const field of fields) {
+      if (!this.fieldSet.has(field)) return false;
+    }
+    if (this.fieldSet.size != fields.length) return false;
+    return true;
   }
   protected get indexedFieldsSet() {
     const isOpen = this.db['_state']['isBeingOpened'];
