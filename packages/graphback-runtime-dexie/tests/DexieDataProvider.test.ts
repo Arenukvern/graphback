@@ -129,27 +129,27 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     expect(todos[0].text).toEqual('todo2');
   });
 
-  // test('find Todo by text', async () => {
-  //   context = await createTestingContext(todoSchema, {
-  //     seedData: {
-  //       Todos: defaultTodoSeed,
-  //     },
-  //   });
-  //   const all = await context.providers.Todos.findBy();
-  //   const todos: Todo[] = await context.providers.Todos.findBy(
-  //     {
-  //       filter: {
-  //         text: { eq: all[0].text },
-  //       },
-  //     },
-  //     ['_id'],
-  //   );
-  //   expect(todos.length).toBeGreaterThan(0);
-  //   const count = await context.providers.Todos.count({
-  //     text: { eq: all[0].text },
-  //   });
-  //   expect(count).toEqual(todos.length);
-  // });
+  test('find Todo by text', async () => {
+    context = await createTestingContext(todoSchema, {
+      seedData: {
+        Todos: defaultTodoSeed,
+      },
+    });
+    const all = await context.providers.Todos.findBy();
+    const todos: Todo[] = await context.providers.Todos.findBy(
+      {
+        filter: {
+          text: { eq: all[0].text },
+        },
+      },
+      ['_id'],
+    );
+    expect(todos.length).toBeGreaterThan(0);
+    const count = await context.providers.Todos.count({
+      text: { eq: all[0].text },
+    });
+    expect(count).toEqual(todos.length);
+  });
 
   // test('find Todo by text, limit defaults to complete set', async () => {
   //   context = await createTestingContext(todoSchema, {

@@ -236,10 +236,10 @@ export function convertFieldQueryToStringCondition({
       case GraphbackQueryOperator.lt:
       case GraphbackQueryOperator.ne:
         const operator = tsGraphbackQueryOperator[fieldQuery.queryOperator];
-        valueComparation = `${tableValue} ${operator} ${compareValue}`;
+        valueComparation = `"${tableValue}" ${operator} "${compareValue}"`;
         break;
       case GraphbackQueryOperator.in:
-        break;
+        throw Error('In operator is not implemented');
       case GraphbackQueryOperator.between:
         // if we here, then something went wrong because beetwen must be divided to le ge...
         // abort
@@ -260,7 +260,7 @@ export function convertFieldQueryToStringCondition({
   const finalValueComparation = valueComparation.length
     ? valueComparation
     : isValidValue;
-  // FIXME: seems like there is an error
+
   if (condition.length == 0) {
     condition = `${condition}${finalValueComparation}`;
   } else {
