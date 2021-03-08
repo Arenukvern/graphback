@@ -3,6 +3,7 @@ import { GraphbackCoreMetadata, Maybe } from '@graphback/core';
 import Dexie, { IndexSpec, Table } from 'dexie';
 import { buildSchema } from 'graphql';
 import { DexieDBDataProvider } from '../src/DexieDBDataProvider';
+import { findDexieTableFieldIndex } from '../src/utils/createDexieIndexes';
 
 Dexie.dependencies.indexedDB = require('fake-indexeddb');
 Dexie.dependencies.IDBKeyRange = require('fake-indexeddb/lib/FDBKeyRange');
@@ -75,12 +76,10 @@ export async function createTestingContext(
         (table: Table) => table.name === tableName,
       );
       if (tableFound) {
-        const indexes = tableFound.schema.indexes;
-        const foundIndex = indexes.find((index) => index.name == indexName);
-        if (foundIndex) return foundIndex;
-        // check primary key as it will be indexed, but not included in indexes
-        const primaryKey = tableFound.schema.primKey;
-        if (primaryKey.name === indexName) return primaryKey;
+        return findDexieTableFieldIndex({
+          indexName,
+          table: tableFound,
+        });
       }
     } while (Date.now() - startTime < waitTime);
     return null;

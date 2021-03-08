@@ -10,7 +10,7 @@ import {
   ModelTableMap,
   NoDataError,
   QueryFilter,
-  TableID
+  TableID,
 } from '@graphback/core';
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
@@ -55,7 +55,7 @@ export class DexieDBDataProvider<Type = any>
       this.tableMap,
       data,
     );
-    this.fixObjectIdForDexie(createData, idField)
+    this.fixObjectIdForDexie(createData, idField);
     const table = this.getTable();
     const maybeId: Maybe<string> = await table.add(createData);
     if (maybeId) return await table.get(maybeId);
@@ -77,8 +77,8 @@ export class DexieDBDataProvider<Type = any>
         `Cannot update ${this.tableName} - missing ID field`,
       );
     }
-    
-    this.fixObjectIdForDexie(updateData, idField)
+
+    this.fixObjectIdForDexie(updateData, idField);
 
     const table = this.getTable();
     const maybeId = await table.put(updateData);
@@ -97,16 +97,15 @@ export class DexieDBDataProvider<Type = any>
     selectedFields?: string[],
   ): Promise<Type> {
     const { idField } = getDatabaseArguments(this.tableMap, data);
-    
 
     if (!idField.value) {
       throw new NoDataError(
         `Cannot delete ${this.tableName} - missing ID field`,
       );
     }
-    
-    this.fixObjectIdForDexie(data, idField)
-    
+
+    this.fixObjectIdForDexie(data, idField);
+
     try {
       const table = this.getTable();
       const id = data[idField.name];
@@ -149,11 +148,11 @@ export class DexieDBDataProvider<Type = any>
      * How it works:
      * - If the search in indexed field, then
      * it uses Dexie WhereCause
-     * - If the search in non indexed field, then 
+     * - If the search in non indexed field, then
      * it uses Dexie filter
      */
-    const table = this.getTable()
-    table.where().
+    // const table = this.getTable()
+    // table.where().
     // const filterQuery = buildQuery(args?.filter);
 
     // const compare = (arg: Partial<Type>) => {
@@ -231,7 +230,7 @@ export class DexieDBDataProvider<Type = any>
   protected getSelectedFields(selectedFields: string[]) {
     return selectedFields?.length ? selectedFields : '*';
   }
-  protected fixObjectIdForDexie(data: Partial<Type>,idField: TableID){
+  protected fixObjectIdForDexie(data: Partial<Type>, idField: TableID) {
     // getting id field name
     if (idField.value == null) {
       // if id is empty generate new one, as Dexie will no generate it
@@ -242,14 +241,14 @@ export class DexieDBDataProvider<Type = any>
       data[idField.name] = idField.value;
     } else {
       // handle case if id already an objectId
-      const isValid = ObjectID.isValid(idField.value)
-      if(isValid){
-        idField.value = idField.value.id
-        data[idField.name] = idField.value
-      } 
+      const isValid = ObjectID.isValid(idField.value);
+      if (isValid) {
+        idField.value = idField.value.id;
+        data[idField.name] = idField.value;
+      }
     }
   }
-  protected getSelectedFieldsFromType(selectedFields: string[], type: Type) {
+  private getSelectedFieldsFromType(selectedFields: string[], type: Type) {
     const obj = {};
     for (const field of this.getSelectedFields(selectedFields)) {
       obj[field] = type[field];
@@ -266,6 +265,18 @@ export class DexieDBDataProvider<Type = any>
     throw Error(
       `Model "${modelName}" must contain a "_id: GraphbackObjectID" primary key. Visit https://graphback.dev/docs/model/datamodel#mongodb to see how to set up one for your MongoDB model.`,
     );
+  }
+  protected get indexedFieldsSet() {
+    if (this.db.isOpen()) {
+      const table = this.getTable();
+      const indexesSet = new Set(table.schema.indexes.map((el) => el.name));
+      indexesSet.add(table.schema.primKey.name);
+      return indexesSet;
+    }
+    return new Set();
+  }
+  protected isFieldIndexed(fieldName: string) {
+    return this.indexedFieldsSet.has(fieldName);
   }
 
   // private sortQuery(

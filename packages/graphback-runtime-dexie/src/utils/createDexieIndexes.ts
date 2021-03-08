@@ -191,8 +191,6 @@ export function getCustomIndex(
         }
       }
     }
-
-    console.log(indexSpec);
     return indexSpec;
   } else {
     return undefined;
@@ -214,3 +212,19 @@ export function getRelationIndex(
     return undefined;
   }
 }
+
+export const findDexieTableFieldIndex = ({
+  indexName,
+  table,
+}: {
+  table: Dexie.Table;
+  indexName: string;
+}): Maybe<IndexSpec> => {
+  const indexes = table.schema.indexes;
+  const foundIndex = indexes.find((index) => index.name == indexName);
+  if (foundIndex) return foundIndex;
+  // check primary key as it will be indexed, but not included in indexes
+  const primaryKey = table.schema.primKey;
+  if (primaryKey.name === indexName) return primaryKey;
+  return null;
+};

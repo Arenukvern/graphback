@@ -1,75 +1,9 @@
-import { QueryFilter } from '@graphback/core';
+import { QueryFilter, TableID } from '@graphback/core';
 import { WhereClause } from 'dexie';
 import * as escapeRegex from 'escape-string-regexp';
+import { Maybe } from 'graphql/jsutils/Maybe';
 
-/** [above()](/docs/WhereClause/WhereClause.above())
-Returns a collection of objects where index is above given key
-**/
-above;
-/**[aboveOrEqual()](/docs/WhereClause/WhereClause.aboveOrEqual())
-Returns a collection of objects where index is above or equal given key
-**/
-aboveOrEqual;
-/** [anyOf()](/docs/WhereClause/WhereClause.anyOf())
-Returns a collection of objects where index is equal to any of the keys in given array
-**/
-anyOf;
-/**[anyOfIgnoreCase()](/docs/WhereClause/WhereClause.anyOfIgnoreCase())
-Returns a collection of objects where index matches any of given strings, ignoring case differences.
-**/
-anyOfIgnoreCase;
-/**[below()](/docs/WhereClause/WhereClause.below())
-Returns a collection of objects where index is below given key
-**/
-below;
-/**[belowOrEqual()](/docs/WhereClause/WhereClause.belowOrEqual())
-Returns a collection of objects where index is below or equal given key
-**/
-belowOrEqual;
-/**[between()](/docs/WhereClause/WhereClause.between())
-Returns a collection of objects where index is between given boundaries
-**/
-between;
-/**[equals()](/docs/WhereClause/WhereClause.equals())
-Returns a collection of objects where index equals given key
-**/
-equals;
-/**[equalsIgnoreCase()](/docs/WhereClause/WhereClause.equalsIgnoreCase())
-Returns a collection of objects where index equals given string-key ignoring case differences
-**/
-equalsIgnoreCase;
-/**[inAnyRange()](/docs/WhereClause/WhereClause.inAnyRange())
-Returns a collection where index is within any of the given ranges.
-**/
-inAnyRange;
-/**[noneOf()](/docs/WhereClause/WhereClause.noneOf())
-Returns a collection where index equals anything but any of the keys in given array
-**/
-noneOf;
-/**[notEqual()](/docs/WhereClause/WhereClause.notEqual())
-Returns a collection where index equals anything but given value
-**/
-notEqual;
-/**[startsWith()](/docs/WhereClause/WhereClause.startsWith())
-Returns a collection of objects where index starts with given string-key
-**/
-startsWith;
-/**[startsWithAnyOf()](/docs/WhereClause/WhereClause.startsWithAnyOf())
-Returns a collection of objects where index starts with any of the given strings
-**/
-startsWithAnyOf;
-/**[startsWithIgnoreCase()](/docs/WhereClause/WhereClause.startsWithIgnoreCase())
-Returns a collection of objects where index starts with given string-key ignoring case differences
-**/
-startsWithIgnoreCase;
-/**[startsWithAnyOfIgnoreCase()](/docs/WhereClause/WhereClause.startsWithAnyOfIgnoreCase())
-Returns a collection of objects where index starts with any of given strings, ignoring case differences
-**/
-startsWithAnyOfIgnoreCase;
-or;
-and;
-
-type RootQueryOperator = '$and' | '$or' | '$nor' | '$not';
+type RootQueryOperator = '$and' | '$or' | '$not';
 const operators = [
   '$exists',
   '$le',
@@ -101,6 +35,34 @@ type OperatorTransform = [QueryOperator | RootQueryOperator, any][];
 
 type OperatorTransformFunction = (value: any) => OperatorTransform;
 
+type GraphbackQueryOperators =
+  | 'eq'
+  | 'ne'
+  | 'lt'
+  | 'le'
+  | 'gt'
+  | 'ge'
+  | 'between'
+  | 'in'
+  | 'contains'
+  | 'startsWith'
+  | 'endsWith';
+
+export type DexieWhereClauses = keyof Dexie.WhereClause;
+export enum DexieFilterTypes {
+  'Filter',
+  'WhereClause',
+}
+export interface DexieQueryMapParam {
+  isIndexed: boolean;
+  filterType: DexieFilterTypes;
+  whereClauseOperator?: Maybe<DexieWhereClauses>;
+  queryOperator?: Maybe<RootQueryOperator | GraphbackQueryOperators>;
+  value: Maybe<unknown>;
+}
+export interface DexieQueryMap {
+  [fieldName: string]: Maybe<DexieQueryMapParam>;
+}
 // A map of functions to transform mongodb incompatible operators
 // Each function returns pairs of a key and an object for that key
 const operatorTransform: {
@@ -159,7 +121,7 @@ function isQueryOperator(key: string): key is QueryOperator {
  *
  * @param {any} filter
  */
-function mapQueryFilterToMongoFilterQuery(filter: any): WhereClause<any> {
+function mapQueryFilterToMongoFilterQuery(filter: any) {
   if (filter === undefined) {
     return undefined;
   }
@@ -196,10 +158,59 @@ function mapQueryFilterToMongoFilterQuery(filter: any): WhereClause<any> {
 }
 
 /**
+ * Work principle:
+ * 1. Flat filter to DexieQueryMap
+ * 2. Execute DexieQueryMap
+ * @param filter
+ */
+export const queryBuilder = <TType>({
+  filter,
+  fieldId,
+  table,
+}: {
+  filter: QueryFilter<TType>;
+  fieldId: TableID;
+  table: Dexie.Table;
+}) => {
+  const dexieQueryMap: DexieQueryMap = {};
+  if (isPrimitive(filter)) {
+    dexieQueryMap[fieldId.name] = {
+      filterType: DexieFilterTypes.WhereClause,
+      isIndexed: true,
+      value: filter,
+    };
+  } else {
+    for (const [field, value] of Object.entries(filter)) {
+      switch (true) {
+        case isRootOperator(field):
+          break;
+        case isGraphbackQueryOperator(field):
+          break;
+        default:
+          // suppose that field is table.field name
+          // then we need to:
+          // TODO: check is this field indexed
+
+          // TODO: get query operator
+          // TODO: get value
+          dexieQueryMap[field] = {
+            isIndexed: false,
+            filterType: DexieFilterTypes.Filter,
+            value,
+          };
+          break;
+      }
+    }
+  }
+};
+
+/**
  * Build a Dexie query from a Graphback filter
  *
  * @param {QueryFilter} filter
  */
-export function buildQuery<M = any>(filter: QueryFilter<M>): WhereClause<any> {
+export function buildQuery<TType = any>(
+  filter: QueryFilter<TType>,
+): WhereClause<any> {
   return mapQueryFilterToMongoFilterQuery(filter);
 }

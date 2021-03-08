@@ -1,8 +1,10 @@
 import { IndexSpec } from 'dexie';
+import { findDexieTableFieldIndex } from '../src/utils/createDexieIndexes';
 import { Context, createTestingContext } from './__util__';
 
 describe('DexieDB indexing', () => {
   let context: Context;
+
   it('can create default indexes', async () => {
     context = await createTestingContext(`
       """
@@ -114,12 +116,57 @@ describe('DexieDB indexing', () => {
       compound: false,
       src: 'noteId',
     };
-    // {
-    //   key: {
-    //     noteId: 1,
-    //   },
-    //   ns: 'test.comment',
-    // }
     expect(index).toMatchObject(expectedIndex);
+  });
+});
+
+describe('DexieDB indexing helpers', () => {
+  let context: Context;
+  const schemaStr = `
+  """
+  @model
+  @versioned
+  """
+  type Note {
+    _id: GraphbackObjectID!
+    """
+    @index
+    """
+    text: String
+    title: String
+  }
+
+  scalar GraphbackObjectID
+  `;
+  const expectedIndex: Partial<IndexSpec> = {
+    auto: false,
+    compound: false,
+    keyPath: 'text',
+    multi: false,
+    name: 'text',
+    src: 'text',
+    unique: false,
+  };
+
+  it('can find index', async () => {
+    context = await createTestingContext(schemaStr);
+    const table = context.db.table('note');
+    const index = findDexieTableFieldIndex({
+      indexName: 'text',
+      table,
+    });
+    expect(index).toMatchObject(expectedIndex);
+  });
+  it('can validate index', async () => {
+    context = await createTestingContext(schemaStr);
+    await context.db.open();
+    const isIndexed = context.providers.Note.isFieldIndexed('text');
+    expect(isIndexed).toBeTruthy();
+
+    const isIdIndexed = context.providers.Note.isFieldIndexed('_id');
+    expect(isIdIndexed).toBeTruthy();
+
+    const isNotIndexed = !context.providers.Note.isFieldIndexed('title');
+    expect(isNotIndexed).toBeTruthy();
   });
 });
