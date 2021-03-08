@@ -14,7 +14,7 @@ import {
   QueryFilter,
   TableID,
 } from '@graphback/core';
-import Dexie, { Collection } from 'dexie';
+import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
 import { buildQuery, runQuery } from './dexieQueryBuilder';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
@@ -165,11 +165,12 @@ export class DexieDBDataProvider<Type = any>
       idField,
       provider: this,
     });
-    const result = runQuery({
+    const result = await runQuery({
       provider: this,
       query: filterQuery,
-    });
-    const data = await this.usePage(
+    }).toArray();
+
+    const data = this.usePage(
       this.sortQuery(result, args?.orderBy),
       args?.page,
     );
@@ -331,27 +332,24 @@ export class DexieDBDataProvider<Type = any>
     return this.indexedFieldsSet.has(fieldName);
   }
 
-  private sortQuery(
-    query: Collection<Type, string>,
-    orderBy: GraphbackOrderBy,
-  ): Collection<Type, string> {
-    const sortOrder: SortOrder = {};
-    if (orderBy) {
-      if (orderBy.field) {
-        sortOrder[orderBy.field] = 1;
-      }
-      if (orderBy.order) {
-        if (orderBy.order.toLowerCase() === 'desc') {
-          sortOrder[orderBy.field] = -1;
-        }
-      }
+  private sortQuery(query: Type[], orderBy?: Maybe<GraphbackOrderBy>): Type[] {
+    if (orderBy.field && orderBy.field.length > 0) {
+      query = query.sort((a, b) => {
+        const fieldA = a[orderBy.field];
+        const fieldB = b[orderBy.field];
+        if (fieldA < fieldB) return -1;
+        if (fieldA > fieldB) return 1;
+        return 0;
+      });
     }
 
-    return query.sort(sortOrder);
+    if (orderBy?.order?.toLowerCase() === 'desc') return query.reverse();
+
+    return query;
   }
 
-  private usePage(query: Collection<Type, string>, page?: GraphbackPage) {
-    if (!page) return query.toArray();
+  private usePage(query: Type[], page?: GraphbackPage) {
+    if (!page) return query;
 
     const { offset, limit } = page;
 
@@ -365,10 +363,10 @@ export class DexieDBDataProvider<Type = any>
         'Invalid limit value. Please use a limit of greater than 1 in queries',
       );
 
-    if (limit) query = query.limit(limit);
+    if (limit) query.length = limit;
 
-    if (offset) query = query.offset(offset);
+    if (offset) query = query.slice(offset);
 
-    return query.toArray();
+    return query;
   }
 }
