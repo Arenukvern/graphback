@@ -18,6 +18,7 @@ import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
 import { buildQuery, DexieQueryMap, runQuery } from './dexieQueryBuilder';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
+import { isNotNull } from './utils/isNotNull';
 var ObjectID = require('bson-objectid');
 
 type PushSelectedResults<TType> = (data: TType, objectsForId: TType[]) => void;
@@ -337,11 +338,20 @@ export class DexieDBDataProvider<Type = any>
    * @param selectedFields
    * @returns
    */
-  protected getSelectedData(data: Type[], selectedFields: string[]) {
-    if (Object.keys(data[0]).length == selectedFields.length) {
-      return data;
+  protected getSelectedData(
+    data: Maybe<Type>[],
+    selectedFields: string[],
+  ): Type[] {
+    const obj = data[0];
+    if (obj == null) return [];
+    if (Object.keys(obj).length == selectedFields.length) {
+      return data.filter(isNotNull);
     }
-    return data.map((el) => this.getSelectedFieldsFromType(selectedFields, el));
+
+    return data.reduce<Type[]>((acc, el) => {
+      if (el) acc.push(this.getSelectedFieldsFromType(selectedFields, el));
+      return acc;
+    }, []);
   }
   protected getSelectedFieldsFromType(selectedFields: string[], type: Type) {
     const obj = {};
