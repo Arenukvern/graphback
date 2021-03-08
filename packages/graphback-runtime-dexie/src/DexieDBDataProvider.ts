@@ -24,6 +24,8 @@ interface SortOrder {
   [fieldName: string]: 1 | -1;
 }
 
+type PushSelectedResults<TType> = (data: TType, objectsForId: TType[]) => void;
+
 /**
  * Graphback provider that connnects to the Dexie database
  */
@@ -132,9 +134,8 @@ export class DexieDBDataProvider<Type = any>
     const table = this.getTable();
 
     const data = await table.where(filter).first();
-    if (data) {
-      return this.getSelectedFieldsFromType(selectedFields, data);
-    }
+
+    if (data) return this.getSelectedFieldsFromType(selectedFields, data);
 
     throw new NoDataError(
       `Cannot find a result for ${this.tableName} with filter: ${JSON.stringify(
@@ -173,15 +174,8 @@ export class DexieDBDataProvider<Type = any>
       args?.page,
     );
 
-    if (data) {
-      // in case if we request all properties then just return all
-      if (Object.keys(data[0]).length == selectedFields.length) {
-        return data;
-      }
-      return data.map((el) =>
-        this.getSelectedFieldsFromType(selectedFields, el),
-      );
-    }
+    if (data) return this.getSelectedData(data, selectedFields);
+
     throw new NoDataError(
       `Cannot find all results for ${
         this.tableName
@@ -205,40 +199,69 @@ export class DexieDBDataProvider<Type = any>
   }
 
   public async batchRead(
-    _relationField: string,
-    _ids: string[],
-    _filter?: QueryFilter,
-    _selectedFields?: string[],
+    relationField: string,
+    ids: string[],
+    filter?: QueryFilter,
+    selectedFields?: string[],
   ): Promise<Type[][]> {
-    // filter = filter || {};
-    // filter[relationField] = { in: ids };
+    filter = filter || {};
+    filter[relationField] = { in: ids };
 
-    // const result = await this.db
-    //   .collection(this.tableName)
-    //   .find(buildQuery(filter), { projection })
-    //   .toArray();
+    const { idField } = getDatabaseArguments(this.tableMap);
 
-    // if (result) {
-    //   const resultsById = ids.map((objId: string) => {
-    //     const objectsForId: any = [];
-    //     for (const data of result) {
-    //       if (data[relationField].toString() === objId.toString()) {
-    //         objectsForId.push(data);
-    //       }
-    //     }
+    const filterQuery = buildQuery({
+      filter: filter,
+      idField,
+      provider: this,
+    });
+    const result = await runQuery({
+      provider: this,
+      query: filterQuery,
+    }).toArray();
+    const toUseSelectedFields =
+      selectedFields.length != Object.keys(result[0] ?? {}).length;
+    if (result) {
+      // To not force check for every loop
+      // we divide mothod into two - with selected fields and without
+      const prepareResults = (pushFn: PushSelectedResults<Type>): Type[][] => {
+        return ids.map((objId: string) => {
+          const objectsForId: Type[] = [];
+          for (const data of result) {
+            if (data[relationField].toString() === objId.toString()) {
+              pushFn(data, objectsForId);
+            }
+          }
+          return objectsForId;
+        });
+      };
 
-    //     return objectsForId;
-    //   });
+      const resultsById = (() => {
+        const pushRawFn: PushSelectedResults<Type> = (data, objectsForId) => {
+          const cuttedType = this.getSelectedFieldsFromType(
+            selectedFields,
+            data,
+          );
+          objectsForId.push(cuttedType);
+        };
+        const pushWithSelectedFieldsFn: PushSelectedResults<Type> = (
+          data,
+          objectsForId,
+        ) => {
+          objectsForId.push(data);
+        };
 
-    //   return resultsById as [Type[]];
-    // }
+        return toUseSelectedFields
+          ? prepareResults(pushWithSelectedFieldsFn)
+          : prepareResults(pushRawFn);
+      })();
 
-    // throw new NoDataError(
-    //   `No results for ${
-    //     this.tableName
-    //   } query and batch read with filter: ${JSON.stringify(filter)}`,
-    // );
-    return [];
+      return resultsById;
+    }
+    throw new NoDataError(
+      `No results for ${
+        this.tableName
+      } query and batch read with filter: ${JSON.stringify(filter)}`,
+    );
   }
   protected getTable() {
     return this.db.table<Type, string>(this.tableName);
@@ -264,7 +287,19 @@ export class DexieDBDataProvider<Type = any>
       }
     }
   }
-  private getSelectedFieldsFromType(selectedFields: string[], type: Type) {
+  /**
+   * in case if we request all properties then just return all
+   * @param data
+   * @param selectedFields
+   * @returns
+   */
+  protected getSelectedData(data: Type[], selectedFields: string[]) {
+    if (Object.keys(data[0]).length == selectedFields.length) {
+      return data;
+    }
+    return data.map((el) => this.getSelectedFieldsFromType(selectedFields, el));
+  }
+  protected getSelectedFieldsFromType(selectedFields: string[], type: Type) {
     const obj = {};
     for (const field of this.getSelectedFields(selectedFields)) {
       obj[field] = type[field];
