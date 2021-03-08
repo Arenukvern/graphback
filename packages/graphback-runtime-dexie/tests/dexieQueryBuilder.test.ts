@@ -154,7 +154,7 @@ describe('DexieDBDataProvider Query Builder', () => {
     const provider = context.providers.Note;
     const result = buildQuery({
       filter: filter as any,
-      fieldId: { value: '', name: '_id' },
+      idField: { value: '', name: '_id' },
       provider,
     });
 

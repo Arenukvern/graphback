@@ -75,7 +75,7 @@ export interface DexieQueryMap {
 
 interface QueryBuilder<TType> {
   filter: QueryFilter<TType>;
-  fieldId: TableID;
+  idField: TableID;
   provider: DexieDBDataProvider<TType>;
 }
 
@@ -87,7 +87,7 @@ interface QueryBuilder<TType> {
  */
 export const queryBuilder = <TType>({
   filter,
-  fieldId,
+  idField,
   provider,
 }: QueryBuilder<TType>): Maybe<DexieQueryMap> => {
   if (filter == null) return undefined;
@@ -123,7 +123,7 @@ export const queryBuilder = <TType>({
     fieldState?: Maybe<Partial<DexieQueryMapParam>>,
   ) => {
     if (isPrimitive(filterValue)) {
-      const fieldName = fieldState?.fieldName ?? fieldId.name;
+      const fieldName = fieldState?.fieldName ?? idField.name;
       const isFieldIndexed = provider['isFieldIndexed'](fieldName);
       const arr = dexieQueryMap[fieldName] ?? [];
       arr.push({
@@ -188,13 +188,14 @@ interface RunQuery<TType> {
 export const runQuery = <TType = any>({ provider, query }: RunQuery<TType>) => {
   const table = provider['getTable']();
   const queryEntires = Object.entries(query);
-  table.filter((tableEntry) => {
+  const result = table.filter((tableEntry) => {
     const isPass = validateTableEntry({
       queryEntires,
       tableEntry,
     });
     return isPass;
   });
+  return result;
 };
 
 export function convertFieldQueryToStringCondition({

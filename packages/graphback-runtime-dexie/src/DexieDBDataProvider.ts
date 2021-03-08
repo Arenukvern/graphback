@@ -10,10 +10,11 @@ import {
   ModelTableMap,
   NoDataError,
   QueryFilter,
-  TableID
+  TableID,
 } from '@graphback/core';
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
+import { buildQuery, runQuery } from './dexieQueryBuilder';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
 var ObjectID = require('bson-objectid');
 
@@ -141,7 +142,7 @@ export class DexieDBDataProvider<Type = any>
   }
 
   public async findBy(
-    _args?: FindByArgs,
+    args?: FindByArgs,
     _selectedFields?: string[],
   ): Promise<Type[]> {
     /**
@@ -150,24 +151,22 @@ export class DexieDBDataProvider<Type = any>
      * it uses Dexie WhereCause
      * - If the search in non indexed field, then
      * it uses Dexie Filter
-     * 
+     *
      * For now it uses only Filter
-     * 
+     *
      */
-    // const table = this.getTable()
-    // table.where().
-    // const filterQuery = buildQuery(args?.filter);
+    const { idField } = getDatabaseArguments(this.tableMap);
 
-    // const compare = (arg: Partial<Type>) => {
-    //   const objToCompare = {};
-    //   for (const field of Object.keys(filter)) {
-    //     objToCompare[field] = arg[field];
-    //   }
-    //   return _.isEqual(objToCompare, filter);
-    // };
-    // TODO: implement query builder
-
-    // const query = this.getTable().find(filterQuery, { projection });
+    const filterQuery = buildQuery({
+      filter: args?.filter,
+      idField,
+      provider: this,
+    });
+    const result = runQuery({
+      provider: this,
+      query: filterQuery,
+    });
+    // TODO; sort result
     // const data = await this.usePage(
     //   this.sortQuery(query, args?.orderBy),
     //   args?.page,
