@@ -77,11 +77,10 @@ export class DexieDBDataProvider<Type = any>
       data,
     );
 
-    if (!idField?.value) {
+    if (idField?.value == null)
       throw new NoDataError(
         `Cannot update ${this.tableName} - missing ID field`,
       );
-    }
 
     this.fixObjectIdForDexie(updateData, idField);
 
@@ -112,11 +111,10 @@ export class DexieDBDataProvider<Type = any>
   ): Promise<Type> {
     const { idField } = getDatabaseArguments(this.tableMap, data);
 
-    if (!idField?.value) {
+    if (idField?.value == null)
       throw new NoDataError(
         `Cannot delete ${this.tableName} - missing ID field`,
       );
-    }
 
     this.fixObjectIdForDexie(data, idField);
 
@@ -322,8 +320,14 @@ export class DexieDBDataProvider<Type = any>
       // handle case if id already an objectId
       const isValid = ObjectID.isValid(idField.value);
       if (isValid) {
-        idField.value = idField.value.id;
-        data[idField.name] = idField.value;
+        switch (typeof idField.value) {
+          case 'string':
+            // nothing to change
+            break;
+          case 'object':
+            idField.value = idField.value.id;
+            data[idField.name] = idField.value;
+        }
       }
     }
   }
