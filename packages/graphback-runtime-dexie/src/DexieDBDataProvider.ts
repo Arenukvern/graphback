@@ -403,7 +403,7 @@ export class DexieDBDataProvider<Type = any>
   }
 
   private usePage(query: Type[], page?: Maybe<GraphbackPage>) {
-    if (!page) return query;
+    if (page == null) return query;
 
     const { offset, limit } = page;
 
@@ -417,9 +417,14 @@ export class DexieDBDataProvider<Type = any>
         'Invalid limit value. Please use a limit of greater than 1 in queries',
       );
 
-    if (limit) query.length = limit;
-
-    if (offset) query = query.slice(offset);
+    // emulating correct limits and offsets
+    if (offset && limit == null) {
+      query = query.slice(offset);
+    } else if (offset && limit) {
+      query = query.slice(offset, limit + offset);
+    } else if (offset == null && limit != null) {
+      query.length = limit;
+    }
 
     return query;
   }

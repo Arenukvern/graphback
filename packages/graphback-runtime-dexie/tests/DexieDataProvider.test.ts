@@ -34,6 +34,10 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     },
   ];
 
+  afterEach(async () => {
+    if (context) await context.providers.Todos['getTable']().clear();
+  });
+
   test('Test missing "_id: GraphbackObjectID" primary key', async () => {
     const schema = `
     """
