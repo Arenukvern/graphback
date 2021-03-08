@@ -10,6 +10,7 @@ export enum RootQueryOperator {
   'not' = 'not',
 }
 const RootQueryOperatorSet = new Set(Object.keys(RootQueryOperator));
+// A map to transform Graphql operators to typescript
 const tsRootQueryOperator: Record<RootQueryOperator, string> = {
   and: '&&',
   not: '!=',
@@ -32,6 +33,7 @@ export enum GraphbackQueryOperator {
   'startsWith' = 'startsWith',
   'endsWith' = 'endsWith',
 }
+// A map to transform Graphql operators to typescript
 const tsGraphbackQueryOperator: Record<GraphbackQueryOperator, string> = {
   eq: '==',
   ne: '!=',
@@ -70,98 +72,6 @@ export interface DexieQueryMapParam {
 export interface DexieQueryMap {
   [fieldName: string]: Maybe<Maybe<DexieQueryMapParam>[]>;
 }
-// A map of functions to transform mongodb incompatible operators
-// Each function returns pairs of a key and an object for that key
-// const operatorTransform: {
-//   [operator: string]: OperatorTransformFunction;
-// } = {
-//   not: (value: any): OperatorTransform => {
-//     if (typeof value === 'object' && !Array.isArray(value)) {
-//       value = [value];
-//     }
-
-//     return [['$not', value]];
-//   },
-//   between: (values: [any, any]): OperatorTransform => {
-//     values.sort();
-
-//     return [
-//       [operatorMap.ge, values[0]],
-//       [operatorMap.le, values[1]],
-//     ];
-//   },
-//   nbetween: (values: [any, any]): OperatorTransform => {
-//     values.sort();
-
-//     return [
-//       [
-//         '$not',
-//         {
-//           [operatorMap.ge]: values[0],
-//           [operatorMap.le]: values[1],
-//         },
-//       ],
-//       ['$exists', true],
-//     ];
-//   },
-//   contains: (value: string): OperatorTransform => {
-//     return [['$regex', new RegExp(escapeRegex(value), 'g')]];
-//   },
-//   startsWith: (value: string): OperatorTransform => {
-//     return [['$regex', new RegExp(`^${escapeRegex(value)}`, 'g')]];
-//   },
-//   endsWith: (value: string): OperatorTransform => {
-//     return [['$regex', new RegExp(`${escapeRegex(value)}$`, 'g')]];
-//   },
-// };
-
-// function isQueryOperator(key: string): key is QueryOperator {
-//   return operators.includes(key as QueryOperator);
-// }
-
-/**
- * Map Graphback Filter to MongoDb QueryFilter
- *
- * @param {any} filter
- */
-// function mapQueryFilterToMongoFilterQuery(filter: any) {
-//   if (filter === undefined) {
-//     return undefined;
-//   }
-
-//   if (Array.isArray(filter)) {
-//     return filter.map(mapQueryFilterToMongoFilterQuery);
-//   } else if (!isPrimitive(filter)) {
-//     return Object.keys(filter).reduce(
-//       (obj: Record<string, Maybe<unknown>>, key: string) => {
-//         const propKey = operatorMap[key] || key;
-//         let propVal: any;
-//         if (isQueryOperator(propKey)) {
-//           propVal = filter[key];
-//         } else {
-//           propVal = mapQueryFilterToMongoFilterQuery(filter[key]);
-//         }
-
-//         if (operatorTransform[propKey]) {
-//           const transforms = operatorTransform[key](propVal);
-
-//           transforms.forEach((t: [QueryOperator, any]) => {
-//             const [operator, value] = t;
-//             propVal = value;
-//             obj[operator] = propVal;
-//           });
-//         } else {
-//           obj[propKey] = propVal;
-//         }
-
-//         return obj;
-//       },
-//       {},
-//     );
-//   }
-
-//   return filter;
-// }
 
 interface QueryBuilder<TType> {
   filter: QueryFilter<TType>;
@@ -231,8 +141,20 @@ export const queryBuilder = <TType>({
         if (Array.isArray(value)) {
           const arrFieldState = fillField(fieldName, fieldState);
           // TODO: implement between and array conditions
-          for (const val of value) {
-            flatifyValues(val, arrFieldState);
+          if (arrFieldState.queryOperator == GraphbackQueryOperator.between) {
+            const [first, second] = value;
+            flatifyValues(first, {
+              ...arrFieldState,
+              queryOperator: GraphbackQueryOperator.ge,
+            });
+            flatifyValues(second, {
+              ...arrFieldState,
+              queryOperator: GraphbackQueryOperator.le,
+            });
+          } else {
+            for (const val of value) {
+              flatifyValues(val, arrFieldState);
+            }
           }
           continue;
         }
@@ -249,7 +171,8 @@ export const queryBuilder = <TType>({
 };
 
 /**
- * Build a Dexie query from a Graphback filter
+ * Build a Dexie query from a Graphback filter.
+ * To run query use runQuery
  *
  * @param {QueryFilter} filter
  */
@@ -282,10 +205,9 @@ export function convertFieldQueryToStringCondition({
   tableValue: unknown;
   condition: string;
   fieldQuery: DexieQueryMapParam;
-}): { condition: string; prePostfix: string } {
+}): string {
   const compareValue = fieldQuery.value;
-  if (compareValue == null)
-    return { condition, prePostfix: RootQueryOperator.and };
+  if (compareValue == null) return condition;
   let prePostfix = '';
   if (fieldQuery.rootOperator != null) {
     prePostfix = `${prePostfix}${tsRootQueryOperator[fieldQuery.rootOperator]}`;
@@ -315,7 +237,8 @@ export function convertFieldQueryToStringCondition({
       case GraphbackQueryOperator.in:
         break;
       case GraphbackQueryOperator.between:
-        // TODO: implement
+        // if we here, then something went wrong because beetwen must be divided to le ge...
+        // abort
         break;
       case GraphbackQueryOperator.contains:
         isValidValue = validateByMatch(escapeRegex(strCompareValue));
@@ -339,7 +262,7 @@ export function convertFieldQueryToStringCondition({
   } else {
     condition = `${condition}${prePostfix}${finalValueComparation}`;
   }
-  return { condition, prePostfix };
+  return condition;
 }
 
 export function validateTableEntry<TType = any>({
@@ -364,13 +287,13 @@ export function validateTableEntry<TType = any>({
             // depending from condition it can be or post or prefix
             return convertFieldQueryToStringCondition({
               tableValue,
-              condition: condition.condition,
+              condition,
               fieldQuery,
             });
           },
-          { condition: '', prePostfix: '' },
+          '',
         );
-        fnConditions.push(`( ${fnQueryCondition.condition} )`);
+        fnConditions.push(`( ${fnQueryCondition} )`);
     }
   }
   const fnBody = `function(){return ${fnConditions.join(

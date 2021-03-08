@@ -134,14 +134,14 @@ describe('DexieDBDataProvider Query Builder', () => {
       {
         filterType: DexieFilterTypes.Filter,
         fieldName: 'completedPercentage',
-        queryOperator: GraphbackQueryOperator.between,
+        queryOperator: GraphbackQueryOperator.ge,
         isIndexed: false,
         value: 20,
       },
       {
         filterType: DexieFilterTypes.Filter,
         fieldName: 'completedPercentage',
-        queryOperator: GraphbackQueryOperator.between,
+        queryOperator: GraphbackQueryOperator.le,
         isIndexed: false,
         value: 40,
       },
@@ -177,9 +177,9 @@ describe('DexieDBDataProvider Query Builder', () => {
       tableValue: truthyTableEntry['title'],
     });
 
-    expect(result.condition).toEqual('true');
+    expect(result).toEqual('true');
   });
-  test('can validate table entry - pass', async () => {
+  test('can validate table entry - should pass', async () => {
     context = await createTestingContext(schemaStr);
 
     context.db.open();
@@ -190,13 +190,13 @@ describe('DexieDBDataProvider Query Builder', () => {
 
     expect(result).toBeTruthy();
   });
-  test('can validate table entry - not pass', async () => {
+  test('can validate table entry - should not pass', async () => {
     context = await createTestingContext(schemaStr);
 
     context.db.open();
     const result = validateTableEntry({
       queryEntires: Object.entries(filterQuery),
-      tableEntry: truthyTableEntry,
+      tableEntry: falsyTableEntry,
     });
 
     expect(result).toBeFalsy();
