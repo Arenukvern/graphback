@@ -1,5 +1,5 @@
 /* eslint-disable max-lines */
-import { buildQuery, DexieFilterTypes } from '../src/dexieQueryBuilder';
+import { buildQuery } from '../src/dexieQueryBuilder';
 import { Context, createTestingContext } from './__util__';
 describe('DexieDBDataProvider Query Builder', () => {
   let context: Context;
@@ -57,63 +57,79 @@ describe('DexieDBDataProvider Query Builder', () => {
       fieldId: { value: '', name: '_id' },
       provider,
     });
-    const expectedResult = [
-      {
-        fieldName: 'title',
-        // FIXME: when will be possible to use WhereClause
-        filterType: DexieFilterTypes.Filter,
-        isIndexed: true,
-        queryOperator: 'contains',
-        value: 'emails',
-      },
-      {
-        fieldName: 'opened',
-        filterType: DexieFilterTypes.Filter,
-        isIndexed: false,
-        queryOperator: 'eq',
-        value: false,
-      },
-      {
-        fieldName: 'likes',
-        filterType: DexieFilterTypes.Filter,
-        isIndexed: false,
-        queryOperator: 'gt',
-        value: 10,
-      },
-      {
-        fieldName: 'completedPercentage',
-        filterType: DexieFilterTypes.Filter,
-        isIndexed: false,
-        queryOperator: 'between',
-        value: [20, 40],
-      },
-      {
-        fieldName: 'title',
-        // FIXME: when will be possible to use WhereClause
-        filterType: DexieFilterTypes.Filter,
-        isIndexed: true,
-        queryOperator: 'startsWith',
-        rootOperator: 'and',
-        value: 'read',
-      },
-      {
-        fieldName: 'likes',
-        filterType: DexieFilterTypes.Filter,
-        isIndexed: false,
-        queryOperator: 'eq',
-        rootOperator: 'or',
-        value: 100,
-      },
-      {
-        fieldName: 'title',
-        // FIXME: when will be possible to use WhereClause
-        filterType: DexieFilterTypes.Filter,
-        isIndexed: true,
-        queryOperator: 'contains',
-        rootOperator: 'not',
-        value: 'archived',
-      },
-    ];
+
+    const expectedResult = {
+      title: [
+        {
+          // FIXME: when will be possible to use WhereClause
+          filterType: 'Filter',
+          fieldName: 'title',
+          queryOperator: 'contains',
+          isIndexed: true,
+          value: 'emails',
+        },
+        {
+          rootOperator: 'and',
+          // FIXME: when will be possible to use WhereClause
+          filterType: 'Filter',
+          fieldName: 'title',
+          queryOperator: 'startsWith',
+          isIndexed: true,
+          value: 'read',
+        },
+        {
+          rootOperator: 'not',
+          // FIXME: when will be possible to use WhereClause
+          filterType: 'Filter',
+          fieldName: 'title',
+          queryOperator: 'contains',
+          isIndexed: true,
+          value: 'archived',
+        },
+      ],
+      opened: [
+        {
+          filterType: 'Filter',
+          fieldName: 'opened',
+          queryOperator: 'eq',
+          isIndexed: false,
+          value: false,
+        },
+      ],
+      likes: [
+        {
+          filterType: 'Filter',
+          fieldName: 'likes',
+          queryOperator: 'gt',
+          isIndexed: false,
+          value: 10,
+        },
+        {
+          rootOperator: 'or',
+          filterType: 'Filter',
+          fieldName: 'likes',
+          queryOperator: 'eq',
+          isIndexed: false,
+          value: 100,
+        },
+      ],
+      completedPercentage: [
+        {
+          filterType: 'Filter',
+          fieldName: 'completedPercentage',
+          queryOperator: 'between',
+          isIndexed: false,
+          value: 20,
+        },
+        {
+          filterType: 'Filter',
+          fieldName: 'completedPercentage',
+          queryOperator: 'between',
+          isIndexed: false,
+          value: 40,
+        },
+      ],
+    };
     expect(result).toEqual(expectedResult);
   });
 });

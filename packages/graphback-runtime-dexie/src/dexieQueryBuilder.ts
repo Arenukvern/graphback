@@ -47,7 +47,9 @@ export interface DexieQueryMapParam {
   value: Maybe<unknown>;
   fieldName: string;
 }
-export interface DexieQueryArr extends Array<Maybe<DexieQueryMapParam>> {}
+export interface DexieQueryMap {
+  [fieldName: string]: Maybe<Maybe<DexieQueryMapParam>[]>;
+}
 // A map of functions to transform mongodb incompatible operators
 // Each function returns pairs of a key and an object for that key
 // const operatorTransform: {
@@ -157,10 +159,10 @@ export const queryBuilder = <TType>({
   filter,
   fieldId,
   provider,
-}: QueryBuilder<TType>): Maybe<DexieQueryArr> => {
+}: QueryBuilder<TType>): Maybe<DexieQueryMap> => {
   if (filter == null) return undefined;
 
-  const dexieQueryArr: DexieQueryArr = [];
+  const dexieQueryMap: DexieQueryMap = {};
   const fillField = (
     fieldName: string,
     fieldState?: Maybe<Partial<DexieQueryMapParam>>,
@@ -193,7 +195,8 @@ export const queryBuilder = <TType>({
     if (isPrimitive(filterValue)) {
       const fieldName = fieldState?.fieldName ?? fieldId.name;
       const isFieldIndexed = provider['isFieldIndexed'](fieldName);
-      dexieQueryArr.push({
+      const arr = dexieQueryMap[fieldName] ?? [];
+      arr.push({
         ...fieldState,
         // FIXME: when WhereClause will be ready replace to
         // isFieldIndexed ? DexieFilterTypes.WhereClause : DexieFilterTypes.Filter
@@ -202,6 +205,7 @@ export const queryBuilder = <TType>({
         value: filterValue,
         fieldName,
       });
+      dexieQueryMap[fieldName] = arr;
     } else {
       for (const [fieldName, value] of Object.entries(filterValue)) {
         if (Array.isArray(value)) {
@@ -221,7 +225,7 @@ export const queryBuilder = <TType>({
     }
   };
   flatifyValues(filter);
-  return dexieQueryArr;
+  return dexieQueryMap;
 };
 
 /**

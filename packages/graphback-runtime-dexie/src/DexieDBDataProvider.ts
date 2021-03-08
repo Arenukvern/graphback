@@ -10,7 +10,7 @@ import {
   ModelTableMap,
   NoDataError,
   QueryFilter,
-  TableID,
+  TableID
 } from '@graphback/core';
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
@@ -145,11 +145,14 @@ export class DexieDBDataProvider<Type = any>
     _selectedFields?: string[],
   ): Promise<Type[]> {
     /**
-     * How it works:
+     * How it should work:
      * - If the search in indexed field, then
      * it uses Dexie WhereCause
      * - If the search in non indexed field, then
-     * it uses Dexie filter
+     * it uses Dexie Filter
+     * 
+     * For now it uses only Filter
+     * 
      */
     // const table = this.getTable()
     // table.where().
