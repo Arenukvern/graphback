@@ -160,13 +160,13 @@ describe('DexieDB indexing helpers', () => {
   it('can validate index', async () => {
     context = await createTestingContext(schemaStr);
     await context.db.open();
-    const isIndexed = context.providers.Note.isFieldIndexed('text');
+    const isIndexed = context.providers.Note['isFieldIndexed']('text');
     expect(isIndexed).toBeTruthy();
 
-    const isIdIndexed = context.providers.Note.isFieldIndexed('_id');
+    const isIdIndexed = context.providers.Note['isFieldIndexed']('_id');
     expect(isIdIndexed).toBeTruthy();
 
-    const isNotIndexed = !context.providers.Note.isFieldIndexed('title');
+    const isNotIndexed = !context.providers.Note['isFieldIndexed']('title');
     expect(isNotIndexed).toBeTruthy();
   });
 });

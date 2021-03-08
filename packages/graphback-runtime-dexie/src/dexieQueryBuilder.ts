@@ -1,18 +1,25 @@
 import { QueryFilter, TableID } from '@graphback/core';
+import * as escapeRegex from 'escape-string-regexp';
 import { Maybe } from 'graphql/jsutils/Maybe';
+import { toString } from 'lodash';
 import { DexieDBDataProvider } from './DexieDBDataProvider';
 
-enum RootQueryOperator {
+export enum RootQueryOperator {
   'and' = 'and',
   'or' = 'or',
   'not' = 'not',
 }
 const RootQueryOperatorSet = new Set(Object.keys(RootQueryOperator));
+const tsRootQueryOperator: Record<RootQueryOperator, string> = {
+  and: '&&',
+  not: '!=',
+  or: '||',
+};
 
 const isRootOperator = (key: string): key is RootQueryOperator =>
   RootQueryOperatorSet.has(key);
 
-enum GraphbackQueryOperator {
+export enum GraphbackQueryOperator {
   'eq' = 'eq',
   'ne' = 'ne',
   'lt' = 'lt',
@@ -25,6 +32,19 @@ enum GraphbackQueryOperator {
   'startsWith' = 'startsWith',
   'endsWith' = 'endsWith',
 }
+const tsGraphbackQueryOperator: Record<GraphbackQueryOperator, string> = {
+  eq: '=',
+  ne: '!=',
+  lt: '<',
+  le: '<=',
+  gt: '>',
+  ge: '>=',
+  between: 'between',
+  in: 'in',
+  contains: 'contains',
+  startsWith: 'startsWith',
+  endsWith: 'endsWith',
+};
 
 const GraphbackQueryOperatorSet = new Set(Object.keys(GraphbackQueryOperator));
 const isGraphbackQueryOperator = (key: string): key is GraphbackQueryOperator =>
@@ -237,3 +257,126 @@ export const buildQuery = <TType = any>(
   arg: QueryBuilder<TType>,
   // TODO: add return type
 ) => queryBuilder(arg);
+
+interface RunQuery<TType> {
+  query: DexieQueryMap;
+  provider: DexieDBDataProvider<TType>;
+}
+export const runQuery = <TType = any>({ provider, query }: RunQuery<TType>) => {
+  const table = provider['getTable']();
+  const queryEntires = Object.entries(query);
+  table.filter((tableEntry) => {
+    const fn = compileQueryFunction({
+      queryEntires,
+      tableEntry,
+    });
+    return fn();
+  });
+};
+
+export function convertFieldQueryToStringCondition({
+  condition,
+  fieldQuery,
+  tableValue,
+}: {
+  tableValue: unknown;
+  condition: string;
+  fieldQuery: DexieQueryMapParam;
+}): { condition: string; prePostfix: string } {
+  const compareValue = fieldQuery.value;
+  if (compareValue == null)
+    return { condition, prePostfix: RootQueryOperator.and };
+  let prePostfix = '';
+  if (fieldQuery.rootOperator != null) {
+    prePostfix = `${prePostfix}${tsRootQueryOperator[fieldQuery.rootOperator]}`;
+  } else {
+    prePostfix = `${prePostfix}${tsRootQueryOperator.and}`;
+  }
+  let valueComparation: string = '';
+  let isValidValue: boolean = false;
+  if (fieldQuery.queryOperator != null) {
+    const strCompareValue = toString(fieldQuery.value);
+    const validateByMatch = (escaptedRegex: string) => {
+      const strTableValue = toString(tableValue);
+      return (
+        (strTableValue.match(new RegExp(escaptedRegex, 'gim')) ?? []).length > 0
+      );
+    };
+    switch (fieldQuery.queryOperator) {
+      case GraphbackQueryOperator.eq:
+      case GraphbackQueryOperator.ge:
+      case GraphbackQueryOperator.gt:
+      case GraphbackQueryOperator.le:
+      case GraphbackQueryOperator.lt:
+      case GraphbackQueryOperator.ne:
+        const operator = tsGraphbackQueryOperator[fieldQuery.queryOperator];
+        valueComparation = `${tableValue} ${operator} ${compareValue}`;
+        break;
+      case GraphbackQueryOperator.in:
+        break;
+      case GraphbackQueryOperator.between:
+        // TODO: implement
+        break;
+      case GraphbackQueryOperator.contains:
+        isValidValue = validateByMatch(escapeRegex(strCompareValue));
+        break;
+      case GraphbackQueryOperator.endsWith:
+        isValidValue = validateByMatch(`${escapeRegex(strCompareValue)}$`);
+        break;
+      case GraphbackQueryOperator.startsWith:
+        isValidValue = validateByMatch(`^${escapeRegex(strCompareValue)}`);
+        break;
+      default:
+        throw Error(`Operator ${fieldQuery.queryOperator} is not supported!`);
+    }
+  }
+  const finalValueComparation = valueComparation.length
+    ? valueComparation
+    : isValidValue;
+  // FIXME: seems like there is an error
+  if (condition.length == 0) {
+    condition = `${condition}${finalValueComparation}`;
+  } else {
+    condition = `${condition}${prePostfix}${finalValueComparation}`;
+  }
+  return { condition, prePostfix };
+}
+
+export function compileQueryFunction<TType = any>({
+  tableEntry,
+  queryEntires,
+}: {
+  tableEntry: TType;
+  queryEntires: [DexieQueryMapParam['fieldName'], DexieQueryMapParam[]][];
+}) {
+  const fnConditions: string[] = [];
+  let prePostfix = '';
+  for (const [fieldName, fieldQueries] of queryEntires) {
+    const filterType = fieldQueries[0].filterType;
+    switch (filterType) {
+      case DexieFilterTypes.WhereClause:
+        // TODO:
+        break;
+      case DexieFilterTypes.Filter:
+      default:
+        const tableValue = tableEntry[fieldName];
+        const fnQueryCondition = fieldQueries.reduce(
+          (condition, fieldQuery) => {
+            // depending from condition it can be or post or prefix
+            return convertFieldQueryToStringCondition({
+              tableValue,
+              condition: condition.condition,
+              fieldQuery,
+            });
+          },
+          { condition: '', prePostfix: '' },
+        );
+        fnConditions.push(fnQueryCondition.condition);
+    }
+  }
+  const fnBody = `return function(){
+    return ${fnConditions.join(` ${RootQueryOperator.and} `)};
+  }`;
+  const fn = new Function(fnBody);
+  return fn;
+}

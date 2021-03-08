@@ -1,5 +1,13 @@
 /* eslint-disable max-lines */
-import { buildQuery } from '../src/dexieQueryBuilder';
+import {
+  buildQuery,
+  compileQueryFunction,
+  convertFieldQueryToStringCondition,
+  DexieFilterTypes,
+  DexieQueryMap,
+  GraphbackQueryOperator,
+  RootQueryOperator,
+} from '../src/dexieQueryBuilder';
 import { Context, createTestingContext } from './__util__';
 describe('DexieDBDataProvider Query Builder', () => {
   let context: Context;
@@ -15,41 +23,125 @@ describe('DexieDBDataProvider Query Builder', () => {
     @index
     """
     title: String
+    opened: Boolean
+    likes: Int
+    completedPercentage: Int
   }
 
   scalar GraphbackObjectID
   `;
+  const tableEntry = {
+    _id: '',
+    text: '',
+    title: 'FunnY EmaIls',
+    opened: false,
+    likes: 1000,
+    completedPercentage: 14,
+  };
+  const filter = {
+    title: {
+      contains: 'emails',
+    },
+    opened: {
+      eq: false,
+    },
+    likes: {
+      gt: 10,
+    },
+    completedPercentage: {
+      between: [20, 40],
+    },
+    and: {
+      title: {
+        startsWith: 'read',
+      },
+    },
+    or: {
+      likes: {
+        eq: 100,
+      },
+    },
+    not: {
+      title: {
+        contains: 'archived',
+      },
+    },
+  };
+  const filterQuery: DexieQueryMap = {
+    title: [
+      {
+        // FIXME: when will be possible to use WhereClause
+        filterType: DexieFilterTypes.Filter,
+        fieldName: 'title',
+        queryOperator: GraphbackQueryOperator.contains,
+        isIndexed: true,
+        value: 'emails',
+      },
+      {
+        rootOperator: RootQueryOperator.and,
+        // FIXME: when will be possible to use WhereClause
+        filterType: DexieFilterTypes.Filter,
+        fieldName: 'title',
+        queryOperator: GraphbackQueryOperator.startsWith,
+        isIndexed: true,
+        value: 'read',
+      },
+      {
+        rootOperator: RootQueryOperator.not,
+        // FIXME: when will be possible to use WhereClause
+        filterType: DexieFilterTypes.Filter,
+        fieldName: 'title',
+        queryOperator: GraphbackQueryOperator.contains,
+        isIndexed: true,
+        value: 'archived',
+      },
+    ],
+    opened: [
+      {
+        filterType: DexieFilterTypes.Filter,
+        fieldName: 'opened',
+        queryOperator: GraphbackQueryOperator.eq,
+        isIndexed: false,
+        value: false,
+      },
+    ],
+    likes: [
+      {
+        filterType: DexieFilterTypes.Filter,
+        fieldName: 'likes',
+        queryOperator: GraphbackQueryOperator.gt,
+        isIndexed: false,
+        value: 10,
+      },
+      {
+        rootOperator: RootQueryOperator.or,
+        filterType: DexieFilterTypes.Filter,
+        fieldName: 'likes',
+        queryOperator: GraphbackQueryOperator.eq,
+        isIndexed: false,
+        value: 100,
+      },
+    ],
+    completedPercentage: [
+      {
+        filterType: DexieFilterTypes.Filter,
+        fieldName: 'completedPercentage',
+        queryOperator: GraphbackQueryOperator.between,
+        isIndexed: false,
+        value: 20,
+      },
+      {
+        filterType: DexieFilterTypes.Filter,
+        fieldName: 'completedPercentage',
+        queryOperator: GraphbackQueryOperator.between,
+        isIndexed: false,
+        value: 40,
+      },
+    ],
+  };
   test('can build primitive', async () => {
     context = await createTestingContext(schemaStr);
-    const filter = {
-      title: {
-        contains: 'emails',
-      },
-      opened: {
-        eq: false,
-      },
-      likes: {
-        gt: 10,
-      },
-      completedPercentage: {
-        between: [20, 40],
-      },
-      and: {
-        title: {
-          startsWith: 'read',
-        },
-      },
-      or: {
-        likes: {
-          eq: 100,
-        },
-      },
-      not: {
-        title: {
-          contains: 'archived',
-        },
-      },
-    };
+
     context.db.open();
     const provider = context.providers.Note;
     const result = buildQuery({
@@ -58,79 +150,37 @@ describe('DexieDBDataProvider Query Builder', () => {
       provider,
     });
 
-    const expectedResult = {
-      title: [
-        {
-          // FIXME: when will be possible to use WhereClause
-          filterType: 'Filter',
-          fieldName: 'title',
-          queryOperator: 'contains',
-          isIndexed: true,
-          value: 'emails',
-        },
-        {
-          rootOperator: 'and',
-          // FIXME: when will be possible to use WhereClause
-          filterType: 'Filter',
-          fieldName: 'title',
-          queryOperator: 'startsWith',
-          isIndexed: true,
-          value: 'read',
-        },
-        {
-          rootOperator: 'not',
-          // FIXME: when will be possible to use WhereClause
-          filterType: 'Filter',
-          fieldName: 'title',
-          queryOperator: 'contains',
-          isIndexed: true,
-          value: 'archived',
-        },
-      ],
-      opened: [
-        {
-          filterType: 'Filter',
-          fieldName: 'opened',
-          queryOperator: 'eq',
-          isIndexed: false,
-          value: false,
-        },
-      ],
-      likes: [
-        {
-          filterType: 'Filter',
-          fieldName: 'likes',
-          queryOperator: 'gt',
-          isIndexed: false,
-          value: 10,
-        },
-        {
-          rootOperator: 'or',
-          filterType: 'Filter',
-          fieldName: 'likes',
-          queryOperator: 'eq',
-          isIndexed: false,
-          value: 100,
-        },
-      ],
-      completedPercentage: [
-        {
-          filterType: 'Filter',
-          fieldName: 'completedPercentage',
-          queryOperator: 'between',
-          isIndexed: false,
-          value: 20,
-        },
-        {
-          filterType: 'Filter',
-          fieldName: 'completedPercentage',
-          queryOperator: 'between',
-          isIndexed: false,
-          value: 40,
-        },
-      ],
-    };
-    expect(result).toEqual(expectedResult);
+    expect(result).toEqual(filterQuery);
+  });
+  test('can convert field query to string condition', async () => {
+    context = await createTestingContext(schemaStr);
+
+    context.db.open();
+    const result = convertFieldQueryToStringCondition({
+      condition: '',
+      fieldQuery: {
+        filterType: DexieFilterTypes.Filter,
+        fieldName: 'title',
+        queryOperator: GraphbackQueryOperator.contains,
+        isIndexed: true,
+        value: 'emails',
+        rootOperator: RootQueryOperator.and,
+      },
+      tableValue: tableEntry['title'],
+    });
+
+    expect(result.condition).toEqual('true');
+  });
+  test('can run compile query function', async () => {
+    context = await createTestingContext(schemaStr);
+
+    context.db.open();
+    const result = compileQueryFunction({
+      queryEntires: Object.entries(filterQuery),
+      tableEntry: tableEntry,
+    });
+
+    expect(result).toEqual('');
   });
 });
 
