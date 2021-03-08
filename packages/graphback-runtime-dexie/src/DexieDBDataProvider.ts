@@ -14,7 +14,7 @@ import {
   QueryFilter,
   TableID,
 } from '@graphback/core';
-import Dexie from 'dexie';
+import Dexie, { Collection } from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
 import { buildQuery, runQuery } from './dexieQueryBuilder';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
@@ -332,9 +332,9 @@ export class DexieDBDataProvider<Type = any>
   }
 
   private sortQuery(
-    query: Cursor<any>,
+    query: Collection<Type, string>,
     orderBy: GraphbackOrderBy,
-  ): Cursor<any> {
+  ): Collection<Type, string> {
     const sortOrder: SortOrder = {};
     if (orderBy) {
       if (orderBy.field) {
@@ -350,31 +350,24 @@ export class DexieDBDataProvider<Type = any>
     return query.sort(sortOrder);
   }
 
-  private usePage(query: Cursor<any>, page?: GraphbackPage) {
-    if (!page) {
-      return query.toArray();
-    }
+  private usePage(query: Collection<Type, string>, page?: GraphbackPage) {
+    if (!page) return query.toArray();
 
     const { offset, limit } = page;
 
-    if (offset < 0) {
+    if (offset < 0)
       throw new Error(
         'Invalid offset value. Please use an offset of greater than or equal to 0 in queries',
       );
-    }
 
-    if (limit < 1) {
+    if (limit < 1)
       throw new Error(
         'Invalid limit value. Please use a limit of greater than 1 in queries',
       );
-    }
 
-    if (limit) {
-      query = query.limit(limit);
-    }
-    if (offset) {
-      query = query.skip(offset);
-    }
+    if (limit) query = query.limit(limit);
+
+    if (offset) query = query.offset(offset);
 
     return query.toArray();
   }
