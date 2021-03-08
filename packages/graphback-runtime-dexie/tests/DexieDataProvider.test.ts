@@ -219,52 +219,52 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     expect(todos[0].text).toEqual(text);
   });
 
-  // test('test orderby w/o order', async () => {
-  //   context = await createTestingContext(todoSchema, {
-  //     seedData: {
-  //       Todos: [
-  //         { text: 'todo3' },
-  //         { text: 'todo1' },
-  //         { text: 'todo4' },
-  //         { text: 'todo2' },
-  //         { text: 'todo5' },
-  //       ],
-  //     },
-  //   });
+  test('test orderby w/o order', async () => {
+    context = await createTestingContext(todoSchema, {
+      seedData: {
+        Todos: [
+          { text: 'todo3' },
+          { text: 'todo1' },
+          { text: 'todo4' },
+          { text: 'todo2' },
+          { text: 'todo5' },
+        ],
+      },
+    });
 
-  //   const todos = await context.providers.Todos.findBy(
-  //     { filter: { text: { contains: 'todo' } }, orderBy: { field: 'text' } },
-  //     fields,
-  //   );
-  //   for (let t = 0; t < todos.length; t++) {
-  //     expect(todos[t].text).toEqual(`todo${t + 1}`);
-  //   }
-  // });
+    const todos = await context.providers.Todos.findBy(
+      { filter: { text: { contains: 'todo' } }, orderBy: { field: 'text' } },
+      fields,
+    );
+    for (let t = 0; t < todos.length; t++) {
+      expect(todos[t].text).toEqual(`todo${t + 1}`);
+    }
+  });
 
-  // test('test orderby with desc order', async () => {
-  //   context = await createTestingContext(todoSchema, {
-  //     seedData: {
-  //       Todos: [
-  //         { text: 'todo3' },
-  //         { text: 'todo1' },
-  //         { text: 'todo4' },
-  //         { text: 'todo2' },
-  //         { text: 'todo5' },
-  //       ],
-  //     },
-  //   });
+  test('test orderby with desc order', async () => {
+    context = await createTestingContext(todoSchema, {
+      seedData: {
+        Todos: [
+          { text: 'todo3' },
+          { text: 'todo1' },
+          { text: 'todo4' },
+          { text: 'todo2' },
+          { text: 'todo5' },
+        ],
+      },
+    });
 
-  //   const todos = await context.providers.Todos.findBy(
-  //     {
-  //       filter: { text: { contains: 'todo' } },
-  //       orderBy: { field: 'text', order: 'desc' },
-  //     },
-  //     fields,
-  //   );
-  //   for (let t = 0; t < todos.length; t++) {
-  //     expect(todos[t].text).toEqual(`todo${5 - t}`);
-  //   }
-  // });
+    const todos = await context.providers.Todos.findBy(
+      {
+        filter: { text: { contains: 'todo' } },
+        orderBy: { field: 'text', order: 'desc' },
+      },
+      fields,
+    );
+    for (let t = 0; t < todos.length; t++) {
+      expect(todos[t].text).toEqual(`todo${5 - t}`);
+    }
+  });
   // FIXME: NotFoundError: No objectStore named note in this database
   // test('createdAt', async () => {
   //   context = await createTestingContext(`
