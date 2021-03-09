@@ -172,6 +172,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 
     expect(result).toEqual(filterQuery);
   });
+
   test('can convert field query to string condition', async () => {
     context = await createTestingContext(schemaStr);
     await context.db.open();
@@ -212,6 +213,29 @@ describe('DexieDBDataProvider Query Builder', () => {
     });
 
     expect(result).toBeFalsy();
+  });
+  test('can use in operator', async () => {
+    context = await createTestingContext(schemaStr);
+    await context.db.open();
+    const findIn = {
+      _id: {
+        in: ['"6047b89e200ea41b97469c21"'],
+      },
+    };
+    const provider = context.providers.Note;
+    const filterQuery = buildQuery({
+      filter: findIn as QueryFilter<any>,
+      idField: { value: '', name: '_id' },
+      provider,
+    });
+
+    const result = validateTableEntry({
+      queryEntires: Object.entries(filterQuery),
+      tableEntry: {
+        _id: '6047b89e200ea41b97469c21',
+      },
+    });
+    expect(result).toBeTruthy();
   });
 });
 
