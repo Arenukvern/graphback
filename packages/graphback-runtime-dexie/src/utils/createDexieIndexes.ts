@@ -64,13 +64,14 @@ export const getIndexedFieldsString = (
       }
     };
     const getFieldSymbol = () => {
+      let sym = '';
       for (const [field, value] of Object.entries(indexSpec)) {
-        if (field != 'name' && value != null) {
-          const sym = getSymbol(field as keyof IndexSpec);
-          return sym;
+        if (value != null) {
+          const temp = getSymbol(field as keyof IndexSpec);
+          sym = `${sym}${temp}`;
         }
       }
-      return '';
+      return sym;
     };
     const indexName = indexSpec.name;
     const sym = getFieldSymbol();
@@ -145,8 +146,11 @@ export function getIndexFields(
     }
 
     const fieldType = toString(JSON.parse(JSON.stringify(field.type)));
-    if (fieldType == 'GraphbackObjectID!') {
-      const maybeId = { name: field.name, unique: true };
+    if (fieldType.includes('GraphbackObjectID')) {
+      const maybeId: Partial<IndexSpec> = {
+        name: field.name,
+        unique: true,
+      };
       if (field.name === '_id' || field.name === 'id') {
         res.push(maybeId);
       } else {
