@@ -1,13 +1,28 @@
-import { ObjectID as BsonObjectID } from "bson";
+import { ObjectID as BsonObjectID } from 'bson';
 
 /* eslint-disable */
 export function isObjectID(value: any) {
-  if (value instanceof BsonObjectID) {
-    return true;
-  }
+  const isBsonObjectId = (val: any) => val instanceof BsonObjectID;
+  if (isBsonObjectId(value)) return true;
+
+  let isBsonExtObjectID: (val: any) => boolean = () => false;
+
   try {
     const BsonExtObjectID = require('bson-ext').ObjectID;
-    return value instanceof BsonExtObjectID;
+    isBsonExtObjectID = (val: any) => val instanceof BsonExtObjectID;
+    if (isBsonExtObjectID(value)) return true;
+  } catch {}
+
+  // value can be number or string, try to parse
+  try {
+    switch (typeof value) {
+      case 'string':
+        const parsedObjectId = parseObjectID(value);
+        if (parsedObjectId.toHexString() == value) {
+          return true;
+        }
+        break;
+    }
   } catch {}
 
   return false;
@@ -22,6 +37,10 @@ export function parseObjectID(value: any) {
 }
 
 export function getObjectIDTimestamp(value: any) {
+  if (typeof value == 'string' && isObjectID(value)) {
+    const objectId = parseObjectID(value);
+    return objectId.getTimestamp();
+  }
   return value.getTimestamp();
 }
 /* eslint-enable */
