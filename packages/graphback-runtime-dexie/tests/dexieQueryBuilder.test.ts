@@ -1,3 +1,4 @@
+// import { ObjectID } from 'bson';
 import {
   buildQuery,
   convertFieldQueryToStringCondition,
@@ -8,8 +9,19 @@ import {
   validateTableEntry,
 } from '../src';
 import { Context, createTestingContext } from './__util__';
+
 describe('DexieDBDataProvider Query Builder', () => {
   let context: Context;
+
+  afterEach(async () => {
+    if (context) {
+      context.providers = {};
+      context.db?.close();
+      context.db?.delete();
+      context.db = null;
+    }
+  });
+
   const schemaStr = `
   """
   @model
@@ -162,7 +174,6 @@ describe('DexieDBDataProvider Query Builder', () => {
   test('can convert field query to string condition', async () => {
     context = await createTestingContext(schemaStr);
 
-    context.db.open();
     const result = convertFieldQueryToStringCondition({
       condition: '',
       fieldQuery: {
@@ -176,12 +187,11 @@ describe('DexieDBDataProvider Query Builder', () => {
       tableValue: truthyTableEntry['title'],
     });
 
-    expect(result).toEqual('true');
+    expect(result.condition).toEqual('true');
   });
   test('can validate table entry - should pass', async () => {
     context = await createTestingContext(schemaStr);
 
-    context.db.open();
     const result = validateTableEntry({
       queryEntires: Object.entries(filterQuery),
       tableEntry: truthyTableEntry,
@@ -192,7 +202,6 @@ describe('DexieDBDataProvider Query Builder', () => {
   test('can validate table entry - should not pass', async () => {
     context = await createTestingContext(schemaStr);
 
-    context.db.open();
     const result = validateTableEntry({
       queryEntires: Object.entries(filterQuery),
       tableEntry: falsyTableEntry,
@@ -209,6 +218,15 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     likes: number;
 //   }
 //   let context: Context;
+
+//   afterEach(async () => {
+//     if (context) {
+//       context.providers = {};
+//       context.db?.close();
+//       context.db?.delete();
+//       context.db = null;
+//     }
+//   });
 
 //   const postSchema = `
 //       """
@@ -232,7 +250,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //   //Create a new database before each tests so that
 //   //all tests can run parallel
 
-//   it('can filter ObjectID', async () => {
+//   test('can filter ObjectID', async () => {
 //     context = await createTestingContext(postSchema);
 
 //     const newPost = await context.providers.Post.create({
@@ -247,7 +265,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     expect(findPost[0].text).toEqual(newPost.text);
 //   });
 
-//   it('can filter using AND', async () => {
+//   test('can filter using AND', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -274,7 +292,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     }
 //   });
 
-//   it('can filter using OR', async () => {
+//   test('can filter using OR', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -299,7 +317,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     }
 //   });
 
-//   it('can filter using list of OR conditions', async () => {
+//   test('can filter using list of OR conditions', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -324,7 +342,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     expect(posts.length).toEqual(3);
 //   });
 
-//   it('can filter using NOT', async () => {
+//   test('can filter using NOT', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -351,7 +369,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     }
 //   });
 
-//   it('can filter using between operator', async () => {
+//   test('can filter using between operator', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -371,7 +389,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     }
 //   });
 
-//   it('can filter using nbetween operator', async () => {
+//   test('can filter using nbetween operator', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -390,7 +408,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     }
 //   });
 
-//   it('can use nested filters', async () => {
+//   test('can use nested filters', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -424,7 +442,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     }
 //   });
 
-//   it('can use contains operator', async () => {
+//   test('can use contains operator', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -443,7 +461,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     }
 //   });
 
-//   it('can use startsWith operator', async () => {
+//   test('can use startsWith operator', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -462,7 +480,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     }
 //   });
 
-//   it('can use endsWith operator', async () => {
+//   test('can use endsWith operator', async () => {
 //     context = await createTestingContext(postSchema, {
 //       seedData: {
 //         Post: defaultPostSeed,
@@ -504,7 +522,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 // describe('queryBuilder scalar filtering', () => {
 //   let context: Context;
 
-//   it('can filter @versioned metadata fields', async () => {
+//   test('can filter @versioned metadata fields', async () => {
 //     context = await createTestingContext(`
 //     """
 //     @model
@@ -550,7 +568,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     ]);
 //   });
 
-//   it('a && (b || c)', () => {
+//   test('a && (b || c)', () => {
 //     const inputQuery: QueryFilter = {
 //       a: {
 //         eq: 1,
@@ -591,7 +609,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     expect(outputQuery).toEqual(expected);
 //   });
 
-//   it('a || b || c starting at root $or operator of query', () => {
+//   test('a || b || c starting at root $or operator of query', () => {
 //     const inputQuery: QueryFilter = {
 //       or: [
 //         {
@@ -635,7 +653,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     expect(Object.keys(outputQuery)).toEqual(['$or']);
 //   });
 
-//   it('(a && b) && (c || c)', () => {
+//   test('(a && b) && (c || c)', () => {
 //     const inputQuery: QueryFilter = {
 //       or: [
 //         {
@@ -691,7 +709,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     expect(outputQuery).toEqual(expected);
 //   });
 
-//   it('a && b && (c || b) from query root (explicit AND)', () => {
+//   test('a && b && (c || b) from query root (explicit AND)', () => {
 //     const inputQuery: QueryFilter = {
 //       a: {
 //         eq: 1,

@@ -3,7 +3,7 @@
 <p align="center">
   <img width="400" src="https://raw.githubusercontent.com/aerogear/graphback/master/website/static/img/logo.png"/>
   <br/>
-  Auto generate database structure, <br/>
+  Auto generate client Dexie(IndexedDb) database structure, <br/>
   GraphQL Resolvers and Queries from GraphQL types 🚀
 </p>
 
@@ -17,5 +17,12 @@ Graphback runtime can provide out of the box resolver and database layer for you
 without writing any line of the code.
 
 Package provides Dexie datasource for Graphback
+
+## Limitations:
+
+No nested filters
+No indexed search - filter implemented in raw ts
+No timestamps (`@versioned` is not works, maybe some another too)
+ObjectId converts to id and resolves as id as it not possible to have primary key as complex object (see limitations for Dexie or IndexedDb)
 
 > NOTE: This package is an early alpha and not officially supported by Graphback
