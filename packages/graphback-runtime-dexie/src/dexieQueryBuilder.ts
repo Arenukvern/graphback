@@ -163,7 +163,7 @@ export const queryBuilder = <TType>({
 
         // suppose that field is table.field name
         // then we need to:
-        flatifyValues(value, updatedState);
+        if (value) flatifyValues(value, updatedState);
       }
     }
   };
