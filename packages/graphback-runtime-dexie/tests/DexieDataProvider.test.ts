@@ -6,23 +6,23 @@ import { Context, createTestingContext } from './__util__';
 
 describe('DexieDBDataProvider Basic CRUD', () => {
   interface Todo {
-    _id: ObjectID;
+    id: ObjectID;
     text: string;
   }
   let context: Context;
 
-  const fields = ['_id', 'text'];
+  const fields = ['id', 'text'];
 
   const todoSchema = `
   """
   @model
   """
   type Todos {
-  _id: GraphbackObjectID!
+  id: ID!
   text: String
   }
 
-  scalar GraphbackObjectID
+  scalar ID
   `;
 
   const defaultTodoSeed = [
@@ -43,13 +43,13 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     }
   });
 
-  test('Test missing "_id: GraphbackObjectID" primary key', async () => {
+  test('Test missing "id: ID" primary key', async () => {
     const schema = `
     """
     @model
     """
     type MissingPrimaryKeyModel {
-    id: ID!
+    id: String
     text: String
     }
     `;
@@ -76,8 +76,8 @@ describe('DexieDBDataProvider Basic CRUD', () => {
       }
       expect(true).toBeFalsy(); // should not reach here
     } catch (error) {
-      expect(error.message).toEqual(
-        'Model "MissingPrimaryKeyModel" must contain a "_id: GraphbackObjectID" primary key. Visit https://graphback.dev/docs/model/datamodel#mongodb to see how to set up one for your MongoDB model.',
+      expect(error.message).toContain(
+        'MissingPrimaryKeyModel type has no primary field.',
       );
     }
   });
@@ -97,7 +97,7 @@ describe('DexieDBDataProvider Basic CRUD', () => {
 
     todo = await context.providers.Todos.update(
       {
-        _id: todo._id,
+        id: todo.id,
         text: 'my updated first todo',
       },
       fields,
@@ -105,12 +105,9 @@ describe('DexieDBDataProvider Basic CRUD', () => {
 
     expect(todo.text).toEqual('my updated first todo');
 
-    const data = await context.providers.Todos.delete(
-      { _id: todo._id },
-      fields,
-    );
+    const data = await context.providers.Todos.delete({ id: todo.id }, fields);
 
-    expect(data._id).toEqual(todo._id);
+    expect(data.id).toEqual(todo.id);
   });
 
   test('find first 1 todo(s) excluding first todo', async () => {
@@ -147,7 +144,7 @@ describe('DexieDBDataProvider Basic CRUD', () => {
           text: { eq: all[0].text },
         },
       },
-      ['_id'],
+      ['id'],
     );
     expect(todos.length).toBeGreaterThan(0);
     const count = await context.providers.Todos.count({
@@ -278,11 +275,11 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //   @versioned
   //   """
   //   type Note {
-  //     _id: GraphbackObjectID!
+  //     id: ID!
   //     text: String
   //   }
 
-  //   scalar GraphbackObjectID
+  //   scalar ID
   //   `);
   //   const cDate = new Date(2020, 5, 26, 18, 29, 23);
   //   advanceTo(cDate);
@@ -298,11 +295,11 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //   @versioned
   //   """
   //   type Note {
-  //     _id: GraphbackObjectID!
+  //     id: ID!
   //     text: String
   //   }
 
-  //   scalar GraphbackObjectID
+  //   scalar ID
   //   `);
   //   const createDate = new Date(2020, 5, 26, 18, 29, 23);
   //   advanceTo(createDate);
@@ -331,11 +328,11 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     @model
     """
     type Todos {
-     _id: GraphbackObjectID!
+     id: ID!
      text: String,
      description: String
     }
-    scalar GraphbackObjectID
+    scalar ID
     `,
       {
         seedData: {
@@ -348,11 +345,11 @@ describe('DexieDBDataProvider Basic CRUD', () => {
       },
     );
 
-    const todos = await context.providers.Todos.findBy({}, ['_id', 'text']);
+    const todos = await context.providers.Todos.findBy({}, ['id', 'text']);
 
     expect(todos.length).toEqual(3);
     todos.forEach((todo: any) => {
-      expect(todo._id).toBeDefined();
+      expect(todo.id).toBeDefined();
       expect(todo.text).toBeDefined();
       expect(todo.description).toBeUndefined(); // should be undefined since not selected
     });
@@ -361,20 +358,20 @@ describe('DexieDBDataProvider Basic CRUD', () => {
       text: 'new todo',
       description: 'todo add description',
     });
-    expect(createdTodo._id).toBeDefined();
+    expect(createdTodo.id).toBeDefined();
 
     const updatedTodo = await context.providers.Todos.update(
-      { _id: createdTodo._id, text: 'updated todo' },
+      { id: createdTodo.id, text: 'updated todo' },
       ['text'],
     );
     expect(updatedTodo.description).toBeUndefined();
     expect(updatedTodo.text).toEqual('updated todo');
 
     const deletedTodo = await context.providers.Todos.delete(
-      { _id: createdTodo._id },
-      ['_id', 'text', 'description'],
+      { id: createdTodo.id },
+      ['id', 'text', 'description'],
     );
-    expect(deletedTodo._id).toEqual(createdTodo._id);
+    expect(deletedTodo.id).toEqual(createdTodo.id);
     expect(deletedTodo.text).toEqual('updated todo');
     expect(deletedTodo.description).toEqual('todo add description');
   });
@@ -385,10 +382,10 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     @model
     """
     type Todo {
-     _id: GraphbackObjectID!
+     id: ID!
      items: Int
     }
-    scalar GraphbackObjectID
+    scalar ID
     `,
       {
         seedData: {
@@ -447,13 +444,13 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   it('a && (b || c)', async () => {
     context = await createTestingContext(
       `
-    scalar GraphbackObjectID
+    scalar ID
 
     """
     @model
     """
     type Todo {
-      _id: GraphbackObjectID!
+      id: ID!
       a: Int
       b: Int
       c: Int
@@ -514,13 +511,13 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   // it('a && (b || c) starting at first $or', async () => {
   //   context = await createTestingContext(
   //     `
-  //   scalar GraphbackObjectID
+  //   scalar ID
 
   //   """
   //   @model
   //   """
   //   type Todo {
-  //     _id: GraphbackObjectID!
+  //     id: ID!
   //     a: Int
   //     b: Int
   //     c: Int
@@ -585,13 +582,13 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   // it('a && (c || b) from nested $or', async () => {
   //   context = await createTestingContext(
   //     `
-  //   scalar GraphbackObjectID
+  //   scalar ID
 
   //   """
   //   @model
   //   """
   //   type Todo {
-  //     _id: GraphbackObjectID!
+  //     id: ID!
   //     a: Int
   //     b: Int
   //     c: Int
@@ -655,13 +652,13 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   it('a || a || a', async () => {
     context = await createTestingContext(
       `
-    scalar GraphbackObjectID
+    scalar ID
 
     """
     @model
     """
     type Todo {
-      _id: GraphbackObjectID!
+      id: ID!
       a: Int
       b: Int
       c: Int
@@ -723,13 +720,13 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   // it('a || (a && b)', async () => {
   //   context = await createTestingContext(
   //     `
-  //   scalar GraphbackObjectID
+  //   scalar ID
 
   //   """
   //   @model
   //   """
   //   type Todo {
-  //     _id: GraphbackObjectID!
+  //     id: ID!
   //     a: Int
   //     b: Int
   //     c: Int

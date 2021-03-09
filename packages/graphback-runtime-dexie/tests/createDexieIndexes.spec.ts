@@ -21,14 +21,14 @@ describe('DexieDB indexing', () => {
       @versioned
       """
       type Note {
-        _id: GraphbackObjectID!
+        id: ID!
         """
         @index
         """
         text: String
       }
 
-      scalar GraphbackObjectID
+      scalar ID
       `);
     const index = await context.findIndex({
       indexName: 'text',
@@ -53,7 +53,7 @@ describe('DexieDB indexing', () => {
       @versioned
       """
       type Note {
-        _id: GraphbackObjectID!
+        id: ID!
         text: String
         """
         @index(
@@ -68,7 +68,7 @@ describe('DexieDB indexing', () => {
         pages: Int
       }
 
-      scalar GraphbackObjectID
+      scalar ID
       `);
 
     const index = await context.findIndex({
@@ -93,7 +93,7 @@ describe('DexieDB indexing', () => {
       @model
       """
       type Note {
-        _id: GraphbackObjectID!
+        id: ID!
         text: String
         """
         @oneToMany(field: 'note')
@@ -105,11 +105,11 @@ describe('DexieDB indexing', () => {
       @model
       """
       type Comment {
-        _id: GraphbackObjectID!
+        id: ID!
         text: String
       }
 
-      scalar GraphbackObjectID
+      scalar ID
       `);
 
     const index = await context.findIndex({
@@ -147,7 +147,7 @@ describe('DexieDB indexing helpers', () => {
   @versioned
   """
   type Note {
-    _id: GraphbackObjectID!
+    id: ID!
     """
     @index
     """
@@ -155,7 +155,7 @@ describe('DexieDB indexing helpers', () => {
     title: String
   }
 
-  scalar GraphbackObjectID
+  scalar ID
   `;
   const expectedIndex: Partial<IndexSpec> = {
     auto: false,
@@ -183,7 +183,7 @@ describe('DexieDB indexing helpers', () => {
     const isIndexed = context.providers.Note['isFieldIndexed']('text');
     expect(isIndexed).toBeTruthy();
 
-    const isIdIndexed = context.providers.Note['isFieldIndexed']('_id');
+    const isIdIndexed = context.providers.Note['isFieldIndexed']('id');
     expect(isIdIndexed).toBeTruthy();
 
     const isNotIndexed = !context.providers.Note['isFieldIndexed']('title');

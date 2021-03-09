@@ -29,7 +29,7 @@ describe('DexieDBDataProvider Query Builder', () => {
   @versioned
   """
   type Note {
-    _id: GraphbackObjectID!
+    id: ID!
     text: String
     """
     @index
@@ -40,10 +40,10 @@ describe('DexieDBDataProvider Query Builder', () => {
     completedPercentage: Int
   }
 
-  scalar GraphbackObjectID
+  scalar ID
   `;
   const truthyTableEntry = {
-    _id: '',
+    id: '',
     text: '',
     title: 'ReAd EmaIls ',
     opened: false,
@@ -51,7 +51,7 @@ describe('DexieDBDataProvider Query Builder', () => {
     completedPercentage: 24,
   };
   const falsyTableEntry = {
-    _id: '',
+    id: '',
     text: '',
     title: 'ReAd arcHIved EmaIls ',
     opened: false,
@@ -166,7 +166,7 @@ describe('DexieDBDataProvider Query Builder', () => {
     const provider = context.providers.Note;
     const result = buildQuery({
       filter: (filter as unknown) as QueryFilter<any>,
-      idField: { value: '', name: '_id' },
+      idField: { value: '', name: 'id' },
       provider,
     });
 
@@ -218,21 +218,21 @@ describe('DexieDBDataProvider Query Builder', () => {
     context = await createTestingContext(schemaStr);
     await context.db.open();
     const findIn = {
-      _id: {
+      id: {
         in: ['"6047b89e200ea41b97469c21"'],
       },
     };
     const provider = context.providers.Note;
     const filterQuery = buildQuery({
       filter: findIn as QueryFilter<any>,
-      idField: { value: '', name: '_id' },
+      idField: { value: '', name: 'id' },
       provider,
     });
 
     const result = validateTableEntry({
       queryEntires: Object.entries(filterQuery),
       tableEntry: {
-        _id: '6047b89e200ea41b97469c21',
+        id: '6047b89e200ea41b97469c21',
       },
     });
     expect(result).toBeTruthy();
@@ -241,7 +241,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 
 // describe('DexieDBDataProvider Advanced Filtering', () => {
 //   interface Post {
-//     _id: ObjectID;
+//     id: ObjectID;
 //     text: string;
 //     likes: number;
 //   }
@@ -261,12 +261,12 @@ describe('DexieDBDataProvider Query Builder', () => {
 //       @model
 //       """
 //       type Post {
-//       _id: GraphbackObjectID
+//       id: ID
 //       text: String
 //       likes: Int
 //       }
 
-//       scalar GraphbackObjectID
+//       scalar ID
 //       `;
 
 //   const defaultPostSeed = [
@@ -287,7 +287,7 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     });
 
 //     const findPost = await context.providers.Post.findBy({
-//       filter: { _id: { eq: newPost._id } },
+//       filter: { id: { eq: newPost.id } },
 //     });
 //     expect(findPost).toHaveLength(1);
 //     expect(findPost[0].text).toEqual(newPost.text);
@@ -557,11 +557,11 @@ describe('DexieDBDataProvider Query Builder', () => {
 //     @versioned
 //     """
 //     type Post {
-//     _id: GraphbackObjectID
+//     id: ID
 //     text: String
 //     }
 
-//     scalar GraphbackObjectID
+//     scalar ID
 //     `);
 //     const startTime = 1590679886048;
 //     advanceTo(startTime);

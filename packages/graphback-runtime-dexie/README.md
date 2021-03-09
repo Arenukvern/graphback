@@ -20,6 +20,7 @@ Package provides Dexie datasource for Graphback
 
 ## Limitations:
 
+No MongoDB supported. This limitation is unfortunate because somewhere in linked packages there is a wrong ObjectID comparation.
 No nested filters
 No indexed search - filter implemented in raw ts
 No timestamps (`@versioned` is not works, maybe some another too)

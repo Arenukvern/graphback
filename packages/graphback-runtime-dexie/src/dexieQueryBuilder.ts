@@ -10,7 +10,7 @@ export enum RootQueryOperator {
   'or' = 'or',
   'not' = 'not',
 }
-const RootQueryOperatorSet = new Set(Object.keys(RootQueryOperator));
+export const RootQueryOperatorSet = new Set(Object.keys(RootQueryOperator));
 // A map to transform Graphql operators to typescript
 const tsRootQueryOperator: Record<RootQueryOperator, string> = {
   and: '&&',

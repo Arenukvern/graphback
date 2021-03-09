@@ -17,12 +17,14 @@ import {
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
 import {
-  isObjectID,
-  parseObjectID,
-} from '../../graphback-core/src/scalars/objectId';
-import { buildQuery, DexieQueryMap, runQuery } from './dexieQueryBuilder';
+  buildQuery,
+  DexieQueryMap,
+  RootQueryOperatorSet,
+  runQuery,
+} from './dexieQueryBuilder';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
 import { isNotNull } from './utils/isNotNull';
+import { isObjectID, parseObjectID } from './utils/objectId';
 type PushSelectedResults<TType> = (data: TType, objectsForId: TType[]) => void;
 
 /**
@@ -38,7 +40,7 @@ export class DexieDBDataProvider<Type = any>
   protected fieldTransformMap: FieldTransformMap;
   protected fieldSet: Set<keyof Type | string>;
   public constructor(model: ModelDefinition, db: Dexie) {
-    this.verifyMongoDBPrimaryKey(model.graphqlType.name, model.primaryKey);
+    this.verifyDBPrimaryKey(model.graphqlType.name, model.primaryKey);
     this.db = db;
     this.tableMap = buildModelTableMap(model.graphqlType);
     this.tableName = this.tableMap.tableName;
@@ -59,12 +61,12 @@ export class DexieDBDataProvider<Type = any>
       data,
     );
     if (idField == null) throw Error('no idField found');
-    this.fixObjectIdForDexie(createData, idField);
+    this.addObjectId(createData, idField);
     const table = this.getTable();
     const maybeId: Maybe<string> = await table.add(createData);
     if (maybeId) {
       const createdType = await table.get(maybeId);
-      if (createdType) return this.validateForObjectId(createdType);
+      if (createdType) return createdType;
     }
 
     throw new NoDataError(`Cannot create ${this.tableName}`);
@@ -89,8 +91,6 @@ export class DexieDBDataProvider<Type = any>
         `Cannot update ${this.tableName} - missing updating data`,
       );
 
-    this.fixObjectIdForDexie(castUpdatedData, idField);
-
     const table = this.getTable();
     const maybeId = await (async () => {
       if (this.verifyTypeIntegrity(castUpdatedData)) {
@@ -106,11 +106,9 @@ export class DexieDBDataProvider<Type = any>
 
         if (updated) {
           if (selectedFields) {
-            return this.validateForObjectId(
-              this.getSelectedFieldsFromType(selectedFields, updated),
-            );
+            return this.getSelectedFieldsFromType(selectedFields, updated);
           } else {
-            return this.validateForObjectId(updated);
+            return updated;
           }
         }
         return null;
@@ -132,8 +130,6 @@ export class DexieDBDataProvider<Type = any>
         `Cannot delete ${this.tableName} - missing ID field`,
       );
 
-    this.fixObjectIdForDexie(data, idField);
-
     try {
       const table = this.getTable();
       const id = data[idField.name];
@@ -145,7 +141,7 @@ export class DexieDBDataProvider<Type = any>
         return dbObj;
       })();
       await table.delete(id);
-      if (dbType) return this.validateForObjectId(dbType);
+      if (dbType) return dbType;
       throw Error();
     } catch (error) {
       throw new NoDataError(
@@ -163,11 +159,9 @@ export class DexieDBDataProvider<Type = any>
     const data = await table.where(filter).first();
 
     if (data) {
-      return this.validateForObjectId(
-        selectedFields
-          ? this.getSelectedFieldsFromType(selectedFields, data)
-          : data,
-      );
+      return selectedFields
+        ? this.getSelectedFieldsFromType(selectedFields, data)
+        : data;
     }
 
     throw new NoDataError(
@@ -193,8 +187,22 @@ export class DexieDBDataProvider<Type = any>
      */
     const { idField } = getDatabaseArguments(this.tableMap);
     if (idField == null) throw Error('cannot find idField');
+    const isQuery = (
+      maybeQuery: Maybe<QueryFilter<Type>> | FindByArgs,
+    ): maybeQuery is QueryFilter<Type> => {
+      if (maybeQuery == null) return false;
+      for (const key of Object.keys(maybeQuery)) {
+        if (this.fieldSet.has(key)) return true;
+        if (RootQueryOperatorSet.has(key)) return true;
+      }
+      return false;
+    };
+    const getQuery = (): Maybe<QueryFilter<Type>> => {
+      if (args?.filter) return args?.filter as QueryFilter<Type>;
+      return isQuery(args) ? args : null;
+    };
     const filterQuery: Maybe<DexieQueryMap> = buildQuery<Type>({
-      filter: args?.filter as Maybe<QueryFilter<Type>>,
+      filter: getQuery(),
       idField,
       provider: this,
     });
@@ -215,9 +223,7 @@ export class DexieDBDataProvider<Type = any>
     );
 
     if (data)
-      return this.validateForObjectId(
-        selectedFields ? this.getSelectedData(data, selectedFields) : data,
-      );
+      return selectedFields ? this.getSelectedData(data, selectedFields) : data;
 
     throw new NoDataError(
       `Cannot find all results for ${
@@ -275,7 +281,7 @@ export class DexieDBDataProvider<Type = any>
       selectedFields != null &&
       selectedFields.length != Object.keys(result[0] ?? {}).length;
     if (result) {
-      result = this.validateForObjectId(result);
+      // result = this.validateForObjectId(result)
       // To not force check for every loop
       // we divide mothod into two - with selected fields and without
       const prepareResults = (pushFn: PushSelectedResults<Type>): Type[][] => {
@@ -328,7 +334,7 @@ export class DexieDBDataProvider<Type = any>
   protected getSelectedFields(selectedFields: string[]) {
     return selectedFields?.length ? selectedFields : '*';
   }
-  protected fixObjectIdForDexie(data: Partial<Type>, idField: TableID) {
+  protected addObjectId(data: Partial<Type>, idField: TableID) {
     // getting id field name
     if (idField.value == null) {
       // if id is empty generate new one, as Dexie will no generate it
@@ -352,27 +358,6 @@ export class DexieDBDataProvider<Type = any>
             data[idField.name] = idField.value;
         }
       }
-    }
-  }
-  // FIXME: temporary fix asgraphback doesn't accept hex object id string
-  protected validateForObjectId(data: Type): Type;
-  protected validateForObjectId(data: Type[]): Type[];
-  protected validateForObjectId(data: any): any {
-    const { idField } = getDatabaseArguments(this.tableMap);
-    if (idField?.name == null) throw Error('Not found a name for primary key');
-    const validateEl = (el: Type) => {
-      const id = el[idField.name];
-      if (typeof id == 'string') {
-        const isValid = parseObjectID(id);
-        if (isValid) el[idField.name] = parseObjectID(id);
-        return el;
-      }
-      return el;
-    };
-    if (Array.isArray(data)) {
-      return data.map((el) => validateEl(el));
-    } else {
-      return validateEl(data);
     }
   }
   /**
@@ -403,18 +388,20 @@ export class DexieDBDataProvider<Type = any>
     }
     return obj as Type;
   }
-  private verifyMongoDBPrimaryKey(
-    modelName: string,
-    primaryKey: FieldDescriptor,
-  ) {
-    if (
-      primaryKey.name === '_id' &&
-      primaryKey.type.includes('GraphbackObjectID')
-    ) {
+  private verifyDBPrimaryKey(modelName: string, primaryKey: FieldDescriptor) {
+    if (primaryKey.name === '_id' && primaryKey.type === 'GraphbackObjectID') {
+      throw Error(
+        `Model "${modelName}" must contain a "id: ID!" primary key instead of _id: GraphbackObjectID!. 
+      If you use are using MongoDb - it not supported.
+      Visit https://graphback.dev/docs/model/datamodel#postgres to see how to 
+      set up one for your Postgres model.`,
+      );
+    }
+    if (primaryKey.name === 'id' && primaryKey.type === 'ID') {
       return;
     }
     throw Error(
-      `Model "${modelName}" must contain a "_id: GraphbackObjectID" primary key. Visit https://graphback.dev/docs/model/datamodel#mongodb to see how to set up one for your MongoDB model.`,
+      `Model "${modelName}" must contain a "id: ID!" primary key. Visit https://graphback.dev/docs/model/datamodel#postgres to see how to set up one for your Postgres model.`,
     );
   }
   protected verifyTypeIntegrity(data: Partial<Type>): data is Type {
