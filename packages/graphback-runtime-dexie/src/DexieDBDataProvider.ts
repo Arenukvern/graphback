@@ -375,7 +375,10 @@ export class DexieDBDataProvider<Type = any>
     modelName: string,
     primaryKey: FieldDescriptor,
   ) {
-    if (primaryKey.name === '_id' && primaryKey.type === 'GraphbackObjectID') {
+    if (
+      primaryKey.name === '_id' &&
+      primaryKey.type.includes('GraphbackObjectID')
+    ) {
       return;
     }
     throw Error(
