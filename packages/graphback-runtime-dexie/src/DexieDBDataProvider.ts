@@ -14,13 +14,13 @@ import {
   QueryFilter,
   TableID,
 } from '@graphback/core';
+import ObjectID from 'bson-objectid';
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
 import { buildQuery, DexieQueryMap, runQuery } from './dexieQueryBuilder';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
 import { isNotNull } from './utils/isNotNull';
-var ObjectID = require('bson-objectid');
-
+var BObjectID = require('bson-objectid');
 type PushSelectedResults<TType> = (data: TType, objectsForId: TType[]) => void;
 
 /**
@@ -326,7 +326,8 @@ export class DexieDBDataProvider<Type = any>
       // and auto increment is too simple. But IndexedDb not supported
       // ObjectId as primary key, so we will use id of IndexedDb
       // see more https://bugzilla.mozilla.org/show_bug.cgi?id=1357636
-      idField.value = ObjectID().id;
+      const newObjectId = BObjectID() as ObjectID;
+      idField.value = newObjectId.toHexString();
       data[idField.name] = idField.value;
     } else {
       // handle case if id already an objectId
@@ -337,7 +338,7 @@ export class DexieDBDataProvider<Type = any>
             // nothing to change
             break;
           case 'object':
-            idField.value = idField.value.id;
+            idField.value = idField.value.toHexString();
             data[idField.name] = idField.value;
         }
       }
