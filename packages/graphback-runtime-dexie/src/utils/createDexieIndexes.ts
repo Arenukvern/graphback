@@ -152,10 +152,6 @@ export function getIndexFields(
       } else {
         reserveFieldPrimaryKeys.push(maybeId);
       }
-    } else if (fieldType.includes('GraphbackObjectID')) {
-      throw Error(
-        'Model has id but it not pointed as required. Use GraphbackObjectID! instead of GraphbackObjectID',
-      );
     }
   }
   if (res.length == 0) {
