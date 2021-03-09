@@ -14,13 +14,15 @@ import {
   QueryFilter,
   TableID,
 } from '@graphback/core';
-import ObjectID from 'bson-objectid';
 import Dexie from 'dexie';
 import { Maybe } from 'graphql/jsutils/Maybe';
+import {
+  isObjectID,
+  parseObjectID,
+} from '../../graphback-core/src/scalars/objectId';
 import { buildQuery, DexieQueryMap, runQuery } from './dexieQueryBuilder';
 import { findAndCreateIndexes } from './utils/createDexieIndexes';
 import { isNotNull } from './utils/isNotNull';
-var BObjectID = require('bson-objectid');
 type PushSelectedResults<TType> = (data: TType, objectsForId: TType[]) => void;
 
 /**
@@ -51,7 +53,6 @@ export class DexieDBDataProvider<Type = any>
       throw e;
     });
   }
-
   public async create(data: Type): Promise<Type> {
     const { data: createData, idField } = getDatabaseArguments(
       this.tableMap,
@@ -63,7 +64,7 @@ export class DexieDBDataProvider<Type = any>
     const maybeId: Maybe<string> = await table.add(createData);
     if (maybeId) {
       const createdType = await table.get(maybeId);
-      if (createdType) return createdType;
+      if (createdType) return this.validateForObjectId(createdType);
     }
 
     throw new NoDataError(`Cannot create ${this.tableName}`);
@@ -102,11 +103,14 @@ export class DexieDBDataProvider<Type = any>
     if (maybeId) {
       const result = await (async () => {
         const updated = await table.get(maybeId);
+
         if (updated) {
           if (selectedFields) {
-            return this.getSelectedFieldsFromType(selectedFields, updated);
+            return this.validateForObjectId(
+              this.getSelectedFieldsFromType(selectedFields, updated),
+            );
           } else {
-            return updated;
+            return this.validateForObjectId(updated);
           }
         }
         return null;
@@ -133,15 +137,15 @@ export class DexieDBDataProvider<Type = any>
     try {
       const table = this.getTable();
       const id = data[idField.name];
+      const dbObj = await table.get(id);
       const dbType = await (async () => {
-        const dbObj = await table.get(id);
         if (selectedFields && dbObj) {
           return this.getSelectedFieldsFromType(selectedFields, dbObj);
         }
         return dbObj;
       })();
       await table.delete(id);
-      if (dbType) return dbType;
+      if (dbType) return this.validateForObjectId(dbType);
       throw Error();
     } catch (error) {
       throw new NoDataError(
@@ -159,9 +163,11 @@ export class DexieDBDataProvider<Type = any>
     const data = await table.where(filter).first();
 
     if (data) {
-      return selectedFields
-        ? this.getSelectedFieldsFromType(selectedFields, data)
-        : data;
+      return this.validateForObjectId(
+        selectedFields
+          ? this.getSelectedFieldsFromType(selectedFields, data)
+          : data,
+      );
     }
 
     throw new NoDataError(
@@ -209,7 +215,9 @@ export class DexieDBDataProvider<Type = any>
     );
 
     if (data)
-      return selectedFields ? this.getSelectedData(data, selectedFields) : data;
+      return this.validateForObjectId(
+        selectedFields ? this.getSelectedData(data, selectedFields) : data,
+      );
 
     throw new NoDataError(
       `Cannot find all results for ${
@@ -254,7 +262,7 @@ export class DexieDBDataProvider<Type = any>
       idField,
       provider: this,
     });
-    const result = await (async () => {
+    let result = await (async () => {
       if (filterQuery == null || Object.keys(filterQuery).length == 0) {
         return await this.getTable().toArray();
       }
@@ -267,6 +275,7 @@ export class DexieDBDataProvider<Type = any>
       selectedFields != null &&
       selectedFields.length != Object.keys(result[0] ?? {}).length;
     if (result) {
+      result = this.validateForObjectId(result);
       // To not force check for every loop
       // we divide mothod into two - with selected fields and without
       const prepareResults = (pushFn: PushSelectedResults<Type>): Type[][] => {
@@ -326,12 +335,13 @@ export class DexieDBDataProvider<Type = any>
       // and auto increment is too simple. But IndexedDb not supported
       // ObjectId as primary key, so we will use id of IndexedDb
       // see more https://bugzilla.mozilla.org/show_bug.cgi?id=1357636
-      const newObjectId = BObjectID() as ObjectID;
+
+      const newObjectId = parseObjectID(null);
       idField.value = newObjectId.toHexString();
       data[idField.name] = idField.value;
     } else {
       // handle case if id already an objectId
-      const isValid = ObjectID.isValid(idField.value);
+      const isValid = isObjectID(idField.value);
       if (isValid) {
         switch (typeof idField.value) {
           case 'string':
@@ -342,6 +352,27 @@ export class DexieDBDataProvider<Type = any>
             data[idField.name] = idField.value;
         }
       }
+    }
+  }
+  // FIXME: temporary fix asgraphback doesn't accept hex object id string
+  protected validateForObjectId(data: Type): Type;
+  protected validateForObjectId(data: Type[]): Type[];
+  protected validateForObjectId(data: any): any {
+    const { idField } = getDatabaseArguments(this.tableMap);
+    if (idField?.name == null) throw Error('Not found a name for primary key');
+    const validateEl = (el: Type) => {
+      const id = el[idField.name];
+      if (typeof id == 'string') {
+        const isValid = parseObjectID(id);
+        if (isValid) el[idField.name] = parseObjectID(id);
+        return el;
+      }
+      return el;
+    };
+    if (Array.isArray(data)) {
+      return data.map((el) => validateEl(el));
+    } else {
+      return validateEl(data);
     }
   }
   /**
