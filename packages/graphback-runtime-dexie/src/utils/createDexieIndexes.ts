@@ -2,6 +2,7 @@ import { Maybe, parseRelationshipAnnotation } from '@graphback/core';
 import Dexie, { IndexSpec } from 'dexie';
 import { GraphQLField, GraphQLObjectType } from 'graphql';
 import { parseMetadata } from 'graphql-metadata';
+import { toString } from 'lodash';
 interface DbTableCreate {
   db: Dexie;
   tableName: string;
@@ -138,16 +139,23 @@ export function getIndexFields(
 
     // Add custom Index if found e.g. @index
     const customIndex = getCustomIndex(field);
-    if (customIndex != null) res.push(customIndex);
+    if (customIndex != null) {
+      res.push(customIndex);
+      continue;
+    }
 
-    const type = JSON.parse(JSON.stringify(field.type));
-    if (type == 'GraphbackObjectID!') {
+    const fieldType = toString(JSON.parse(JSON.stringify(field.type)));
+    if (fieldType == 'GraphbackObjectID!') {
       const maybeId = { name: field.name, unique: true };
       if (field.name === '_id' || field.name === 'id') {
         res.push(maybeId);
       } else {
         reserveFieldPrimaryKeys.push(maybeId);
       }
+    } else if (fieldType.includes('GraphbackObjectID')) {
+      throw Error(
+        'Model has id but it not pointed as required. Use GraphbackObjectID! instead of GraphbackObjectID',
+      );
     }
   }
   if (res.length == 0) {

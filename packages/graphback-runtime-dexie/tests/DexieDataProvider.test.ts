@@ -1,4 +1,4 @@
-import { GraphbackCoreMetadata } from '@graphback/core';
+import { GraphbackCoreMetadata, QueryFilter } from '@graphback/core';
 import { ObjectID } from 'bson';
 import { buildSchema } from 'graphql';
 import { DexieDBDataProvider } from '../src';
@@ -37,8 +37,9 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   afterEach(async () => {
     if (context) {
       context.providers = {};
-      context.db.close();
-      context.db.delete();
+      context.db?.close();
+      context.db?.delete();
+      context.db = null;
     }
   });
 
@@ -378,136 +379,136 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     expect(deletedTodo.description).toEqual('todo add description');
   });
 
-  // test('get todos with field value not in a given arrray argument', async () => {
-  //   context = await createTestingContext(
-  //     `"""
-  //   @model
-  //   """
-  //   type Todo {
-  //    _id: GraphbackObjectID!
-  //    items: Int
-  //   }
-  //   scalar GraphbackObjectID
-  //   `,
-  //     {
-  //       seedData: {
-  //         Todo: [
-  //           {
-  //             items: 1,
-  //           },
-  //           {
-  //             items: 2,
-  //           },
-  //           {
-  //             items: 3,
-  //           },
-  //           {
-  //             items: 4,
-  //           },
-  //           {
-  //             items: 5,
-  //           },
-  //           {
-  //             items: 6,
-  //           },
-  //           {
-  //             items: 8,
-  //           },
-  //         ],
-  //       },
-  //     },
-  //   );
+  test('get todos with field value not in a given array argument', async () => {
+    context = await createTestingContext(
+      `"""
+    @model
+    """
+    type Todo {
+     _id: GraphbackObjectID!
+     items: Int
+    }
+    scalar GraphbackObjectID
+    `,
+      {
+        seedData: {
+          Todo: [
+            {
+              items: 1,
+            },
+            {
+              items: 2,
+            },
+            {
+              items: 3,
+            },
+            {
+              items: 4,
+            },
+            {
+              items: 5,
+            },
+            {
+              items: 6,
+            },
+            {
+              items: 8,
+            },
+          ],
+        },
+      },
+    );
 
-  //   const { providers } = context;
+    const { providers } = context;
 
-  //   // verify that not in operator works
-  //   const allTodos = await providers.Todo.findBy();
-  //   const newTodoItems = 2709;
-  //   await providers.Todo.create({ items: newTodoItems });
-  //   const allTodosAfterCreation = await providers.Todo.findBy();
+    // verify that not in operator works
+    const allTodos = await providers.Todo.findBy();
+    const newTodoItems = 2709;
+    await providers.Todo.create({ items: newTodoItems });
+    const allTodosAfterCreation = await providers.Todo.findBy();
 
-  //   expect(allTodosAfterCreation.length).toEqual(allTodos.length + 1); // verify that a new todo was created
+    expect(allTodosAfterCreation.length).toEqual(allTodos.length + 1); // verify that a new todo was created
 
-  //   // retrieve all todo that do not have the newTodoItems using the in operator and verify
+    // retrieve all todo that do not have the newTodoItems using the in operator and verify
 
-  //   const oldTodos = await providers.Todo.findBy({
-  //     filter: {
-  //       not: {
-  //         items: {
-  //           in: [newTodoItems],
-  //         },
-  //       },
-  //     },
-  //   });
+    const oldTodos = await providers.Todo.findBy({
+      filter: {
+        not: {
+          items: {
+            in: [newTodoItems],
+          },
+        },
+      },
+    });
 
-  //   expect(oldTodos).toEqual(allTodos); // assert that we did not retrieve the newly added todo item
-  // });
+    expect(oldTodos).toEqual(allTodos); // assert that we did not retrieve the newly added todo item
+  });
 
-  // it('a && (b || c)', async () => {
-  //   context = await createTestingContext(
-  //     `
-  //   scalar GraphbackObjectID
+  it('a && (b || c)', async () => {
+    context = await createTestingContext(
+      `
+    scalar GraphbackObjectID
 
-  //   """
-  //   @model
-  //   """
-  //   type Todo {
-  //     _id: GraphbackObjectID
-  //     a: Int
-  //     b: Int
-  //     c: Int
-  //   }
-  //   `,
-  //     {
-  //       seedData: {
-  //         Todo: [
-  //           {
-  //             a: 1,
-  //             b: 5,
-  //             c: 8,
-  //           },
-  //           {
-  //             a: 1,
-  //             b: 2,
-  //             c: 10,
-  //           },
-  //           {
-  //             a: 1,
-  //             b: 5,
-  //             c: 3,
-  //           },
-  //           {
-  //             a: 6,
-  //             b: 6,
-  //             c: 3,
-  //           },
-  //         ],
-  //       },
-  //     },
-  //   );
+    """
+    @model
+    """
+    type Todo {
+      _id: GraphbackObjectID!
+      a: Int
+      b: Int
+      c: Int
+    }
+    `,
+      {
+        seedData: {
+          Todo: [
+            {
+              a: 1,
+              b: 5,
+              c: 8,
+            },
+            {
+              a: 1,
+              b: 2,
+              c: 10,
+            },
+            {
+              a: 1,
+              b: 5,
+              c: 3,
+            },
+            {
+              a: 6,
+              b: 6,
+              c: 3,
+            },
+          ],
+        },
+      },
+    );
 
-  //   const filter: QueryFilter = {
-  //     a: {
-  //       eq: 1,
-  //     },
-  //     or: [
-  //       {
-  //         c: {
-  //           eq: 6,
-  //         },
-  //       },
-  //       {
-  //         b: {
-  //           eq: 5,
-  //         },
-  //       },
-  //     ],
-  //   };
+    const filter: QueryFilter = {
+      a: {
+        eq: 1,
+      },
+      or: [
+        {
+          c: {
+            eq: 6,
+          },
+        },
+        {
+          b: {
+            eq: 5,
+          },
+        },
+      ],
+    };
 
-  //   const items = await context.providers.Todo.findBy({ filter });
+    const items = await context.providers.Todo.findBy({ filter });
 
-  //   expect(items).toHaveLength(2);
-  // });
+    expect(items).toHaveLength(2);
+  });
 
   // it('a && (b || c) starting at first $or', async () => {
   //   context = await createTestingContext(

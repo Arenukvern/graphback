@@ -209,19 +209,17 @@ export function convertFieldQueryToStringCondition({
   tableValue: unknown;
   condition: string;
   fieldQuery: DexieQueryMapParam;
-}): string {
+}): { condition: string; postfix: string } {
+  let prePostfix = tsRootQueryOperator.and;
   const compareValue = fieldQuery.value;
-  if (compareValue == null) return condition;
-  let prePostfix = '';
+  if (compareValue == null) return { condition, postfix: prePostfix };
   if (fieldQuery.rootOperator != null) {
-    prePostfix = `${prePostfix}${tsRootQueryOperator[fieldQuery.rootOperator]}`;
-  } else {
-    prePostfix = `${prePostfix}${tsRootQueryOperator.and}`;
+    prePostfix = tsRootQueryOperator[fieldQuery.rootOperator];
   }
   let valueComparation: string = '';
   let isValidValue: boolean = false;
   if (fieldQuery.queryOperator != null) {
-    const strCompareValue = toString(fieldQuery.value);
+    const strCompareValue = () => toString(fieldQuery.value);
     const validateByMatch = (escaptedRegex: string) => {
       const strTableValue = toString(tableValue);
       return (
@@ -239,19 +237,21 @@ export function convertFieldQueryToStringCondition({
         valueComparation = `"${tableValue}" ${operator} "${compareValue}"`;
         break;
       case GraphbackQueryOperator.in:
-        throw Error('In operator is not implemented');
+        valueComparation = `"${tableValue}" ${prePostfix} "${compareValue}"`;
+        break;
+
       case GraphbackQueryOperator.between:
         // if we here, then something went wrong because beetwen must be divided to le ge...
         // abort
         break;
       case GraphbackQueryOperator.contains:
-        isValidValue = validateByMatch(escapeRegex(strCompareValue));
+        isValidValue = validateByMatch(escapeRegex(strCompareValue()));
         break;
       case GraphbackQueryOperator.endsWith:
-        isValidValue = validateByMatch(`${escapeRegex(strCompareValue)}$`);
+        isValidValue = validateByMatch(`${escapeRegex(strCompareValue())}$`);
         break;
       case GraphbackQueryOperator.startsWith:
-        isValidValue = validateByMatch(`^${escapeRegex(strCompareValue)}`);
+        isValidValue = validateByMatch(`^${escapeRegex(strCompareValue())}`);
         break;
       default:
         throw Error(`Operator ${fieldQuery.queryOperator} is not supported!`);
@@ -266,7 +266,7 @@ export function convertFieldQueryToStringCondition({
   } else {
     condition = `${condition}${prePostfix}${finalValueComparation}`;
   }
-  return condition;
+  return { condition, postfix: prePostfix };
 }
 
 export function validateTableEntry<TType = any>({
@@ -280,7 +280,12 @@ export function validateTableEntry<TType = any>({
   ][];
 }) {
   const fnConditions: string[] = [];
+  const queryCount = queryEntires.length;
+  let i = 0;
   for (const [fieldName, fieldQueries] of queryEntires) {
+    i++;
+    let rootPostfix = tsRootQueryOperator.and;
+    const isNotLastQuery = i != queryCount;
     if (fieldQueries == null) continue;
     const filterType = fieldQueries[0]?.filterType;
     switch (filterType) {
@@ -294,20 +299,23 @@ export function validateTableEntry<TType = any>({
           (condition, fieldQuery) => {
             if (fieldQuery == null) return condition;
             // depending from condition it can be or post or prefix
-            return convertFieldQueryToStringCondition({
+            const result = convertFieldQueryToStringCondition({
               tableValue,
               condition,
               fieldQuery,
             });
+            rootPostfix = result.postfix;
+            return result.condition;
           },
           '',
         );
         fnConditions.push(`( ${fnQueryCondition} )`);
     }
+    if (isNotLastQuery) {
+      fnConditions.push(rootPostfix);
+    }
   }
-  const fnBody = `function(){return ${fnConditions.join(
-    ` ${tsRootQueryOperator[RootQueryOperator.and]} `,
-  )};}`;
+  const fnBody = `function(){return ${fnConditions.join(` `)};}`;
   const fn = new Function('return ' + fnBody);
   return fn()();
 }
