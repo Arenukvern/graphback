@@ -1,4 +1,5 @@
 // import { ObjectID } from 'bson';
+import { QueryFilter } from '@graphback/core';
 import {
   buildQuery,
   convertFieldQueryToStringCondition,
@@ -160,11 +161,11 @@ describe('DexieDBDataProvider Query Builder', () => {
   };
   test('can build primitive', async () => {
     context = await createTestingContext(schemaStr);
+    await context.db.open();
 
-    context.db.open();
     const provider = context.providers.Note;
     const result = buildQuery({
-      filter: filter as any,
+      filter: (filter as unknown) as QueryFilter<any>,
       idField: { value: '', name: '_id' },
       provider,
     });
@@ -173,6 +174,7 @@ describe('DexieDBDataProvider Query Builder', () => {
   });
   test('can convert field query to string condition', async () => {
     context = await createTestingContext(schemaStr);
+    await context.db.open();
 
     const result = convertFieldQueryToStringCondition({
       condition: '',
@@ -191,6 +193,7 @@ describe('DexieDBDataProvider Query Builder', () => {
   });
   test('can validate table entry - should pass', async () => {
     context = await createTestingContext(schemaStr);
+    await context.db.open();
 
     const result = validateTableEntry({
       queryEntires: Object.entries(filterQuery),
@@ -201,6 +204,7 @@ describe('DexieDBDataProvider Query Builder', () => {
   });
   test('can validate table entry - should not pass', async () => {
     context = await createTestingContext(schemaStr);
+    await context.db.open();
 
     const result = validateTableEntry({
       queryEntires: Object.entries(filterQuery),

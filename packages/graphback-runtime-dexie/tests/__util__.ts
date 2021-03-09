@@ -54,10 +54,8 @@ export async function createTestingContext(
   for (const model of models) {
     providers[model.graphqlType.name] = new DexieDBDataProvider(model, db);
   }
-
   // if seed data is supplied, insert it into tables
   if (config?.seedData) {
-    db.open();
     const tableNames = Object.keys(config.seedData);
     for (const tableName of tableNames) {
       for (const element of config.seedData[tableName]) {

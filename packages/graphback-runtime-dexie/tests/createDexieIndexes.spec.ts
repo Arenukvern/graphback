@@ -5,6 +5,15 @@ import { Context, createTestingContext } from './__util__';
 describe('DexieDB indexing', () => {
   let context: Context;
 
+  afterEach(async () => {
+    if (context) {
+      context.providers = {};
+      context.db?.close();
+      context.db?.delete();
+      context.db = null;
+    }
+  });
+
   it('can create default indexes', async () => {
     context = await createTestingContext(`
       """
@@ -122,6 +131,16 @@ describe('DexieDB indexing', () => {
 
 describe('DexieDB indexing helpers', () => {
   let context: Context;
+
+  afterEach(async () => {
+    if (context) {
+      context.providers = {};
+      context.db?.close();
+      context.db?.delete();
+      context.db = null;
+    }
+  });
+
   const schemaStr = `
   """
   @model
@@ -151,6 +170,7 @@ describe('DexieDB indexing helpers', () => {
   it('can find index', async () => {
     context = await createTestingContext(schemaStr);
     const table = context.db.table('note');
+    await context.db.open();
     const index = findDexieTableFieldIndex({
       indexName: 'text',
       table,
