@@ -510,6 +510,7 @@ describe('DexieDBDataProvider Basic CRUD', () => {
     expect(items).toHaveLength(2);
   });
 
+  // TODO:'a && (b || c) starting at first $or'
   // it('a && (b || c) starting at first $or', async () => {
   //   context = await createTestingContext(
   //     `
@@ -519,7 +520,7 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //   @model
   //   """
   //   type Todo {
-  //     _id: GraphbackObjectID
+  //     _id: GraphbackObjectID!
   //     a: Int
   //     b: Int
   //     c: Int
@@ -580,6 +581,7 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //   expect(items).toHaveLength(2);
   // });
 
+  // TODO:'a && (c || b) from nested $or'
   // it('a && (c || b) from nested $or', async () => {
   //   context = await createTestingContext(
   //     `
@@ -589,7 +591,7 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //   @model
   //   """
   //   type Todo {
-  //     _id: GraphbackObjectID
+  //     _id: GraphbackObjectID!
   //     a: Int
   //     b: Int
   //     c: Int
@@ -650,74 +652,74 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //   expect(items).toHaveLength(2);
   // });
 
-  // it('a || a || a', async () => {
-  //   context = await createTestingContext(
-  //     `
-  //   scalar GraphbackObjectID
+  it('a || a || a', async () => {
+    context = await createTestingContext(
+      `
+    scalar GraphbackObjectID
 
-  //   """
-  //   @model
-  //   """
-  //   type Todo {
-  //     _id: GraphbackObjectID
-  //     a: Int
-  //     b: Int
-  //     c: Int
-  //   }
-  //   `,
-  //     {
-  //       seedData: {
-  //         Todo: [
-  //           {
-  //             a: 1,
-  //             b: 5,
-  //             c: 8,
-  //           },
-  //           {
-  //             a: 2,
-  //             b: 2,
-  //             c: 10,
-  //           },
-  //           {
-  //             a: 3,
-  //             b: 5,
-  //             c: 3,
-  //           },
-  //           {
-  //             a: 6,
-  //             b: 6,
-  //             c: 3,
-  //           },
-  //         ],
-  //       },
-  //     },
-  //   );
+    """
+    @model
+    """
+    type Todo {
+      _id: GraphbackObjectID!
+      a: Int
+      b: Int
+      c: Int
+    }
+    `,
+      {
+        seedData: {
+          Todo: [
+            {
+              a: 1,
+              b: 5,
+              c: 8,
+            },
+            {
+              a: 2,
+              b: 2,
+              c: 10,
+            },
+            {
+              a: 3,
+              b: 5,
+              c: 3,
+            },
+            {
+              a: 6,
+              b: 6,
+              c: 3,
+            },
+          ],
+        },
+      },
+    );
 
-  //   const filter: QueryFilter = {
-  //     or: [
-  //       {
-  //         a: {
-  //           eq: 1,
-  //         },
-  //       },
-  //       {
-  //         a: {
-  //           eq: 2,
-  //         },
-  //       },
-  //       {
-  //         a: {
-  //           eq: 3,
-  //         },
-  //       },
-  //     ],
-  //   };
+    const filter: QueryFilter = {
+      or: [
+        {
+          a: {
+            eq: 1,
+          },
+        },
+        {
+          a: {
+            eq: 2,
+          },
+        },
+        {
+          a: {
+            eq: 3,
+          },
+        },
+      ],
+    };
 
-  //   const items = await context.providers.Todo.findBy({ filter });
+    const items = await context.providers.Todo.findBy({ filter });
 
-  //   expect(items).toHaveLength(3);
-  // });
-
+    expect(items).toHaveLength(3);
+  });
+  // TODO:'a || (a && b)'
   // it('a || (a && b)', async () => {
   //   context = await createTestingContext(
   //     `
@@ -727,7 +729,7 @@ describe('DexieDBDataProvider Basic CRUD', () => {
   //   @model
   //   """
   //   type Todo {
-  //     _id: GraphbackObjectID
+  //     _id: GraphbackObjectID!
   //     a: Int
   //     b: Int
   //     c: Int
