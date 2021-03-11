@@ -1,18 +1,17 @@
-import { Maybe, parseRelationshipAnnotation } from '@graphback/core'
-import Dexie, { IndexSpec } from 'dexie'
-import { GraphQLField, GraphQLObjectType } from 'graphql'
-import { parseMetadata } from 'graphql-metadata'
-import { toString } from 'lodash'
+import { Maybe, parseRelationshipAnnotation } from '@graphback/core';
+import Dexie, { IndexSpec } from 'dexie';
+import { GraphQLField, GraphQLObjectType } from 'graphql';
+import { parseMetadata } from 'graphql-metadata';
 interface DbTableCreate {
-  db: Dexie
-  tableName: string
+  db: Dexie;
+  tableName: string;
 }
 interface ApplyIndexes extends DbTableCreate {
-  indexes: Partial<IndexSpec>[]
+  indexes: Partial<IndexSpec>[];
 }
 
 interface FindAndCreateIndexes extends DbTableCreate {
-  baseType: GraphQLObjectType
+  baseType: GraphQLObjectType;
 }
 
 export async function findAndCreateIndexes({
@@ -20,8 +19,8 @@ export async function findAndCreateIndexes({
   db,
   tableName,
 }: FindAndCreateIndexes) {
-  const indexes = getIndexFields(baseType)
-  await applyIndexes({ indexes, db, tableName })
+  const indexes = getIndexFields(baseType);
+  await applyIndexes({ indexes, db, tableName });
 }
 
 /**
@@ -31,73 +30,73 @@ export async function findAndCreateIndexes({
  * @returns {string}
  */
 export const getIndexedFieldsString = (
-  indexes: Partial<IndexSpec>[]
+  indexes: Partial<IndexSpec>[],
 ): string => {
   const strArr = indexes.reduce<Maybe<string>[]>((indexesArr, indexSpec) => {
     if (indexSpec.compound) {
       const arr =
         indexSpec.keyPath != null && Array.isArray(indexSpec.keyPath)
           ? indexSpec.keyPath
-          : [indexSpec.keyPath]
-      const finalStr = `[${arr.join('+')}]`
-      indexesArr.push(finalStr)
-      return indexesArr
+          : [indexSpec.keyPath];
+      const finalStr = `[${arr.join('+')}]`;
+      indexesArr.push(finalStr);
+      return indexesArr;
     }
 
     // see more at https://dexie.org/docs/Version/Version.stores()
     const getSymbol = (field: keyof IndexSpec) => {
       switch (field) {
         case 'auto':
-          return '++'
+          return '++';
         case 'compound':
-          return ''
+          return '';
         case 'keyPath':
-          return ''
+          return '';
         case 'multi':
-          return '*'
+          return '*';
         case 'name':
-          return ''
+          return '';
         case 'src':
-          return ''
+          return '';
         case 'unique':
-          return '&'
+          return '&';
       }
-    }
+    };
     const getFieldSymbol = () => {
-      let sym = ''
+      let sym = '';
       for (const [field, value] of Object.entries(indexSpec)) {
         if (value != null) {
-          const temp = getSymbol(field as keyof IndexSpec)
-          sym = `${sym}${temp}`
+          const temp = getSymbol(field as keyof IndexSpec);
+          sym = `${sym}${temp}`;
         }
       }
-      return sym
-    }
-    const indexName = indexSpec.name
-    const sym = getFieldSymbol()
-    const finalIndex = `${sym}${indexName}`
-    indexesArr.push(finalIndex)
-    return indexesArr
-  }, [])
+      return sym;
+    };
+    const indexName = indexSpec.name;
+    const sym = getFieldSymbol();
+    const finalIndex = `${sym}${indexName}`;
+    indexesArr.push(finalIndex);
+    return indexesArr;
+  }, []);
 
   const strIndexes = strArr
     .filter((el) => {
-      if (el == null || el.length == 0) return false
-      return true
+      if (el == null || el.length == 0) return false;
+      return true;
     })
-    .join(',')
+    .join(',');
 
-  return strIndexes
-}
+  return strIndexes;
+};
 
 export async function applyIndexes({ tableName, db, indexes }: ApplyIndexes) {
   try {
-    const strIndexedFields = getIndexedFieldsString(indexes)
+    const strIndexedFields = getIndexedFieldsString(indexes);
     if (strIndexedFields.length === 0)
-      throw Error('At least one primary key must bew defined.')
+      throw Error('At least one primary key must bew defined.');
     db.version(db.verno == null || db.verno < 1 ? 1 : db.verno).stores({
       [tableName]: strIndexedFields,
-    })
+    });
   } catch (error) {
     // let message: string;
     // if (error.codeName === 'IndexOptionsConflict') {
@@ -119,107 +118,107 @@ export async function applyIndexes({ tableName, db, indexes }: ApplyIndexes) {
     // TODO: implement erorrs
     // eslint-disable-next-line no-console
     console.error(
-      `${error} If all else fails, try recreating the index manually.`
-    )
+      `${error} If all else fails, try recreating the index manually.`,
+    );
   }
 }
 
 export function getIndexFields(
-  baseType: GraphQLObjectType
+  baseType: GraphQLObjectType,
 ): Partial<IndexSpec>[] {
-  const res: Partial<IndexSpec>[] = []
-  const reserveFieldPrimaryKeys: Partial<IndexSpec>[] = []
-  const fields = baseType.getFields()
+  const res: Partial<IndexSpec>[] = [];
+  const reserveFieldPrimaryKeys: Partial<IndexSpec>[] = [];
+  const fields = baseType.getFields();
   for (const field of Object.values(fields)) {
     // Add Index on relation fields
-    const relationIndex = getRelationIndex(field)
+    const relationIndex = getRelationIndex(field);
     if (relationIndex != null) {
-      res.push(relationIndex)
-      continue
+      res.push(relationIndex);
+      continue;
     }
 
     // Add custom Index if found e.g. @index
-    const customIndex = getCustomIndex(field)
+    const customIndex = getCustomIndex(field);
     if (customIndex != null) {
-      res.push(customIndex)
-      continue
+      res.push(customIndex);
+      continue;
     }
 
-    const fieldType = toString(JSON.parse(JSON.stringify(field.type)))
+    const fieldType = JSON.stringify(field.type);
     if (fieldType.includes('GraphbackObjectID') || fieldType.includes('ID')) {
       const maybeId: Partial<IndexSpec> = {
         name: field.name,
         unique: true,
-      }
+      };
       if (field.name === '_id' || field.name === 'id') {
-        res.push(maybeId)
+        res.push(maybeId);
       } else {
-        reserveFieldPrimaryKeys.push(maybeId)
+        reserveFieldPrimaryKeys.push(maybeId);
       }
     }
   }
   if (res.length == 0) {
     if (reserveFieldPrimaryKeys.length == 0)
-      throw Error('Model must have at least one primary key!')
+      throw Error('Model must have at least one primary key!');
     // push if any keys were reserved
-    res.push(reserveFieldPrimaryKeys[0])
+    res.push(reserveFieldPrimaryKeys[0]);
   }
-  return res
+  return res;
 }
 
 export function getCustomIndex(
-  field: GraphQLField<any, any>
+  field: GraphQLField<any, any>,
 ): Maybe<Partial<IndexSpec>> {
   const indexMetadata = field.description
     ? parseMetadata('index', field.description)
-    : null
+    : null;
   if (indexMetadata) {
     const indexSpec: Partial<IndexSpec> = {
       name: field.name,
-    }
+    };
     if (typeof indexMetadata === 'object') {
       // unwrappinng case of proxy
-      const obj = JSON.parse(JSON.stringify(indexMetadata))
+      const obj = JSON.parse(JSON.stringify(indexMetadata));
       if (obj.hasOwnProperty('key')) {
-        const key = obj['key'] as Maybe<Record<string, string>>
+        const key = obj['key'] as Maybe<Record<string, string>>;
         if (key != null) {
-          indexSpec.keyPath = Object.keys(key)
+          indexSpec.keyPath = Object.keys(key);
           switch (indexSpec.keyPath.length) {
             case 2:
-              indexSpec.compound = true
-              break
+              indexSpec.compound = true;
+              break;
             case 0:
               // nothing
-              break
+              break;
             default:
               console.error(
-                `Custom index for field: ${field.name} have ${indexSpec.keyPath.length} keys but can have only 2`
-              )
+                `Custom index for field: ${field.name} have ${indexSpec.keyPath.length} keys but can have only 2`,
+              );
           }
         }
       }
     }
-    return indexSpec
+    return indexSpec;
   } else {
-    return null
+    return null;
   }
 }
 
 export function getRelationIndex(
-  field: GraphQLField<any, any>
+  field: GraphQLField<any, any>,
 ): Maybe<Partial<IndexSpec>> {
   const relationshipData = field.description
     ? parseRelationshipAnnotation(field.description)
-    : null
+    : null;
   if (
     relationshipData?.kind &&
     ['manyToOne', 'manyToMany'].includes(relationshipData.kind)
   ) {
     return {
       name: relationshipData.key,
-    }
+    };
   } else {
-    return null
+    return null;
   }
 }
 
@@ -227,14 +226,14 @@ export const findDexieTableFieldIndex = ({
   indexName,
   table,
 }: {
-  table: Dexie.Table
-  indexName: string
+  table: Dexie.Table;
+  indexName: string;
 }): Maybe<IndexSpec> => {
-  const indexes = table.schema.indexes
-  const foundIndex = indexes.find((index) => index.name == indexName)
-  if (foundIndex) return foundIndex
+  const indexes = table.schema.indexes;
+  const foundIndex = indexes.find((index) => index.name == indexName);
+  if (foundIndex) return foundIndex;
   // check primary key as it will be indexed, but not included in indexes
-  const primaryKey = table.schema.primKey
-  if (primaryKey.name === indexName) return primaryKey
-  return null
-}
+  const primaryKey = table.schema.primKey;
+  if (primaryKey.name === indexName) return primaryKey;
+  return null;
+};

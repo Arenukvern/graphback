@@ -19,6 +19,7 @@
   "scripts": {
     "clean": "rimraf coverage dist types",
     "build": "tsc",
+    "esbuild": "vite build && tsc --emitDeclarationOnly",
     "watch": "tsc -w ",
     "lint": "eslint -t stylish --project \"tsconfig.json\"",
     "test": "jest"
@@ -55,6 +56,7 @@
     "ts-jest": "26.4.4",
     "ts-node": "9.1.1",
     "tsutils": "3.17.1",
-    "typescript": "4.1.3"
+    "typescript": "4.1.3",
+    "vite": "^2.0.4"
   }
 }

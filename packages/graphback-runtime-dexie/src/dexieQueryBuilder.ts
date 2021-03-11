@@ -2,7 +2,6 @@ import { QueryFilter, TableID } from '@graphback/core';
 import { Collection } from 'dexie';
 import * as escapeRegex from 'escape-string-regexp';
 import { Maybe } from 'graphql/jsutils/Maybe';
-import { toString } from 'lodash';
 import { DexieDBDataProvider } from './DexieDBDataProvider';
 
 export enum RootQueryOperator {
@@ -199,6 +198,19 @@ export const runQuery = <TType = any>({
     return isPass;
   });
   return result;
+};
+
+const toString = (anything: unknown) => {
+  switch (typeof anything) {
+    case 'string':
+      return anything;
+    case 'boolean':
+    case 'number':
+    case 'symbol':
+      return anything.toString();
+    default:
+      return JSON.stringify(anything);
+  }
 };
 
 const cleanUpDoubleQuotes = (str: string) =>
